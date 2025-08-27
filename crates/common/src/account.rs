@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::{Result, anyhow};
 use prism_errors::AccountError;
 use prism_keys::VerifyingKey;
@@ -31,23 +33,38 @@ pub struct SignedData {
 /// tree.
 pub struct Account {
     /// The unique identifier for the account.
-    id: String,
+    // TODO(DID): Make Did type that has verification, also the did should be hash over self
+    // without the did
+    did: String,
 
     /// The transaction nonce for the account.
+    // TODO(DID): This is not included in the PLC spec, do we need to modify it in any way?
     nonce: u64,
+
+    // TODO(DID): Implement conversion from VerifyingKey to DID format.
+    #[serde(rename = "verificationMethods")]
+    verification_methods: HashMap<String, VerifyingKey>,
 
     /// The current set of valid keys for the account. Any of these keys can be
     /// used to sign transactions.
-    valid_keys: Vec<VerifyingKey>,
+    #[serde(rename = "rotationKeys")]
+    rotation_keys: Vec<VerifyingKey>,
 
-    /// Arbitrary signed data associated with the account, used for bookkeeping
-    /// externally signed data from keys that don't live on Prism.
-    signed_data: Vec<SignedData>,
+    #[serde(rename = "alsoKnownAs")]
+    also_known_as: Vec<String>,
+    services: HashMap<String, Service>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct Service {
+    #[serde(rename = "type")]
+    pub service_type: String,
+    pub endpoint: String,
 }
 
 impl Account {
     pub fn id(&self) -> &str {
-        &self.id
+        &self.did
     }
 
     pub fn nonce(&self) -> u64 {
@@ -55,11 +72,7 @@ impl Account {
     }
 
     pub fn valid_keys(&self) -> &[VerifyingKey] {
-        &self.valid_keys
-    }
-
-    pub fn signed_data(&self) -> &[SignedData] {
-        &self.signed_data
+        &self.rotation_keys
     }
 
     /// Creates a new request builder with the default NoopPrismApi implementation.
@@ -124,13 +137,13 @@ impl Account {
                 }
             }
             _ => {
-                if tx.id != self.id {
+                if tx.id != self.did {
                     return Err(AccountError::TransactionIdError(
                         tx.id.to_string(),
-                        self.id.to_string(),
+                        self.did.to_string(),
                     ));
                 }
-                if !self.valid_keys.contains(&tx.vk) {
+                if !self.rotation_keys.contains(&tx.vk) {
                     return Err(AccountError::InvalidKey);
                 }
             }
@@ -144,12 +157,12 @@ impl Account {
     fn validate_operation(&self, operation: &Operation) -> Result<()> {
         match operation {
             Operation::AddKey { key } => {
-                if self.valid_keys.contains(key) {
+                if self.rotation_keys.contains(key) {
                     return Err(anyhow!("Key already exists"));
                 }
             }
             Operation::RevokeKey { key } => {
-                if !self.valid_keys.contains(key) {
+                if !self.rotation_keys.contains(key) {
                     return Err(anyhow!("Key does not exist"));
                 }
             }
@@ -169,14 +182,14 @@ impl Account {
 
         match operation {
             Operation::AddKey { key } => {
-                self.valid_keys.push(key.clone());
+                self.rotation_keys.push(key.clone());
             }
             Operation::RevokeKey { key } => {
-                self.valid_keys.retain(|k| k != key);
+                self.rotation_keys.retain(|k| k != key);
             }
             Operation::CreateAccount { id, key, .. } => {
-                self.id = id.clone();
-                self.valid_keys.push(key.clone());
+                self.did = id.clone();
+                self.rotation_keys.push(key.clone());
             }
         }
 

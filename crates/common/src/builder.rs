@@ -5,7 +5,7 @@ use crate::{
     account::Account,
     api::{PendingTransaction, PrismApi, PrismApiError, noop::NoopPrismApi},
     digest::Digest,
-    operation::{Operation, ServiceChallenge, ServiceChallengeInput, SignatureBundle},
+    operation::{Operation, SignatureBundle},
     transaction::{Transaction, UnsignedTransaction},
 };
 
@@ -107,8 +107,6 @@ where
 
         let operation = Operation::CreateAccount {
             id: self.id.clone(),
-            service_id: self.service_id,
-            challenge: ServiceChallengeInput::Signed(signature.clone()),
             key,
         };
 

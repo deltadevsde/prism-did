@@ -1,15 +1,8 @@
-use std::collections::HashMap;
-
 use jmt::{
     KeyHash, RootHash,
     proof::{SparseMerkleNode, SparseMerkleProof, UpdateMerkleProof},
 };
-use prism_common::{
-    account::Account,
-    digest::Digest,
-    operation::{Operation, ServiceChallenge, ServiceChallengeInput},
-    transaction::Transaction,
-};
+use prism_common::{account::Account, digest::Digest, transaction::Transaction};
 use prism_errors::ProofError;
 use prism_serde::binary::ToBinary;
 use serde::{Deserialize, Serialize};
@@ -25,7 +18,6 @@ pub struct Batch {
     pub prev_root: Digest,
     pub new_root: Digest,
 
-    pub service_proofs: HashMap<String, ServiceProof>,
     pub proofs: Vec<Proof>,
 }
 
@@ -34,7 +26,6 @@ impl Batch {
         Batch {
             prev_root,
             new_root: next_root,
-            service_proofs: HashMap::new(),
             proofs,
         }
     }
@@ -44,24 +35,9 @@ impl Batch {
         for proof in &self.proofs {
             match proof {
                 Proof::Insert(insert_proof) => {
+                    // TODO(DID): Hash Verification here or one level lower?
                     // When verifying account creation, ensure service challenge is verified as well
-                    let challenge = match &insert_proof.tx.operation {
-                        Operation::CreateAccount { service_id, .. } => {
-                            let service_challenge = self
-                                .service_proofs
-                                .get(service_id)
-                                .and_then(|service_proof| service_proof.service_challenge());
-                            if service_challenge.is_none() {
-                                return Err(ProofError::MissingServiceChallenge(
-                                    service_id.to_string(),
-                                ));
-                            }
-                            service_challenge
-                        }
-
-                        _ => None,
-                    };
-                    insert_proof.verify(challenge)?;
+                    insert_proof.verify()?;
                     root = insert_proof.new_root;
                 }
                 Proof::Update(update_proof) => {
@@ -72,29 +48,8 @@ impl Batch {
         }
 
         assert_eq!(root, self.new_root);
-        for (id, service_proof) in &self.service_proofs {
-            let keyhash = KeyHash::with::<TreeHasher>(&id);
-            let serialized_account = service_proof.service.encode_to_bytes()?;
-            service_proof
-                .proof
-                .verify_existence(RootHash(root.0), keyhash, serialized_account)
-                .map_err(|e| ProofError::ExistenceError(e.to_string()))?;
-        }
 
         Ok(())
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ServiceProof {
-    pub root: Digest,
-    pub proof: SparseMerkleProof<TreeHasher>,
-    pub service: Account,
-}
-
-impl ServiceProof {
-    pub fn service_challenge(&self) -> Option<&ServiceChallenge> {
-        self.service.service_challenge()
     }
 }
 
@@ -126,7 +81,7 @@ pub struct InsertProof {
 
 impl InsertProof {
     /// The method called in circuit to verify the state transition to the new root.
-    pub fn verify(&self, service_challenge: Option<&ServiceChallenge>) -> Result<(), ProofError> {
+    pub fn verify(&self) -> Result<(), ProofError> {
         self.non_membership_proof
             .verify_nonexistence()
             .map_err(|e| ProofError::NonexistenceError(e.to_string()))?;
@@ -135,26 +90,7 @@ impl InsertProof {
             .process_transaction(&self.tx)
             .map_err(|e| ProofError::TransactionError(e.to_string()))?;
 
-        // If we are creating an account, we need to additionally verify the service challenge
-        if let Operation::CreateAccount {
-            id,
-            service_id,
-            challenge,
-            key,
-        } = &self.tx.operation
-        {
-            let hash = Digest::hash_items(&[id.as_bytes(), service_id.as_bytes(), &key.to_bytes()]);
-
-            if service_challenge.is_none() {
-                return Err(ProofError::MissingServiceChallenge(service_id.to_string()));
-            }
-
-            let ServiceChallenge::Signed(challenge_vk) = service_challenge.unwrap();
-            let ServiceChallengeInput::Signed(challenge_signature) = challenge;
-            challenge_vk
-                .verify_signature(hash, challenge_signature)
-                .map_err(|e| ProofError::VerificationError(e.to_string()))?;
-        }
+        // TODO(DID): Hash verification here
 
         let serialized_account = account.encode_to_bytes()?;
 

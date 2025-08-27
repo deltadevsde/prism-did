@@ -7,7 +7,7 @@ pub use prism_common::{
     api::{PendingTransaction, PrismApi, PrismApiError, types::*},
     builder,
     digest::Digest,
-    operation::{ServiceChallenge, ServiceChallengeInput, SignatureBundle},
+    operation::SignatureBundle,
     transaction::{Transaction, UnsignedTransaction},
 };
 pub use prism_keys::{CryptoAlgorithm, Signature, SigningKey, VerifyingKey};

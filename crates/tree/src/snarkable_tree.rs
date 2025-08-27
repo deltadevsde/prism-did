@@ -10,17 +10,14 @@ use prism_serde::binary::{FromBinary, ToBinary};
 use tracing::{debug, warn};
 
 use prism_common::{
-    account::Account,
-    digest::Digest,
-    operation::{Operation, ServiceChallenge, ServiceChallengeInput},
-    transaction::Transaction,
+    account::Account, digest::Digest, operation::Operation, transaction::Transaction,
 };
 
 use crate::{
     AccountResponse::{self, *},
     hasher::TreeHasher,
     key_directory_tree::KeyDirectoryTree,
-    proofs::{Batch, InsertProof, MerkleProof, Proof, ServiceProof, UpdateProof},
+    proofs::{Batch, InsertProof, MerkleProof, Proof, UpdateProof},
 };
 
 /// Represents a tree that can be used to verifiably store and retrieve [`Account`]s.
@@ -40,20 +37,15 @@ impl<S> SnarkableTree for KeyDirectoryTree<S>
 where
     S: TreeReader + TreeWriter + Send + Sync,
 {
+    // TODO(DID): Pretty sure that with the removal of services this can be simplified
     fn process_batch(&mut self, transactions: Vec<Transaction>) -> Result<Batch> {
         debug!("creating block with {} transactions", transactions.len());
         let prev_commitment = self.get_commitment()?;
-        let mut services = HashSet::new();
 
         let mut proofs = Vec::new();
         for transaction in transactions {
             match self.process_transaction(transaction.clone()) {
-                Ok(proof) => {
-                    if let Operation::CreateAccount { service_id, .. } = transaction.operation {
-                        services.insert(service_id);
-                    }
-                    proofs.push(proof)
-                }
+                Ok(proof) => proofs.push(proof),
                 Err(e) => {
                     // Log the error and continue with the next transaction
                     warn!(
@@ -66,25 +58,7 @@ where
 
         let current_commitment = self.get_commitment()?;
 
-        let mut batch = Batch::init(prev_commitment, current_commitment, proofs);
-
-        for service in services {
-            let service_key_hash = KeyHash::with::<TreeHasher>(&service);
-            let response = self.get(service_key_hash)?;
-            match response {
-                Found(account, proof) => {
-                    let service_proof = ServiceProof {
-                        root: current_commitment,
-                        service: *account,
-                        proof: proof.proof,
-                    };
-                    batch.service_proofs.insert(service.clone(), service_proof);
-                }
-                NotFound(proof) => {
-                    bail!("Service account not found: {:?}", proof);
-                }
-            }
-        }
+        let batch = Batch::init(prev_commitment, current_commitment, proofs);
 
         Ok(batch)
     }
@@ -99,12 +73,7 @@ where
 
                 Ok(Proof::Update(Box::new(proof)))
             }
-            Operation::CreateAccount {
-                id,
-                service_id,
-                challenge,
-                key,
-            } => {
+            Operation::CreateAccount { id, key } => {
                 ensure!(
                     transaction.id == id.as_str(),
                     "Id of transaction needs to be equal to operation id"
@@ -120,24 +89,25 @@ where
                     )));
                 }
 
-                let service_key_hash = KeyHash::with::<TreeHasher>(service_id);
+                // TODO(DID): key must now sign over a different object! Independent of some
+                // challenge
 
-                let Found(service_account, _) = self.get(service_key_hash)? else {
-                    bail!("Failed to get account for service ID {}", service_id);
-                };
+                // let service_key_hash = KeyHash::with::<TreeHasher>(service_id);
 
-                let Some(service_challenge) = service_account.service_challenge() else {
-                    bail!("Service account does not contain a service challenge");
-                };
+                // let Found(service_account, _) = self.get(service_key_hash)? else {
+                //     bail!("Failed to get account for service ID {}", service_id);
+                // };
+
+                // let Some(service_challenge) = service_account.service_challenge() else {
+                //     bail!("Service account does not contain a service challenge");
+                // };
 
                 // Hash and sign credentials that have been signed by the external service
-                let hash =
-                    Digest::hash_items(&[id.as_bytes(), service_id.as_bytes(), &key.to_bytes()]);
+                // let hash =
+                //     Digest::hash_items(&[id.as_bytes(), service_id.as_bytes(), &key.to_bytes()]);
 
-                let ServiceChallenge::Signed(service_pubkey) = service_challenge;
-                let ServiceChallengeInput::Signed(challenge_signature) = &challenge;
-
-                service_pubkey.verify_signature(hash, challenge_signature)?;
+                // let ServiceChallenge::Signed(service_pubkey) = service_challenge;
+                // let ServiceChallengeInput::Signed(challenge_signature) = &challenge;
 
                 debug!("creating new account for user ID {}", id);
 

@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use crate::{
     api::{PrismApi, noop::NoopPrismApi},
     builder::{ModifyAccountRequestBuilder, RequestBuilder},
-    operation::{Operation, ServiceChallenge},
+    operation::Operation,
     transaction::Transaction,
 };
 
@@ -43,9 +43,6 @@ pub struct Account {
     /// Arbitrary signed data associated with the account, used for bookkeeping
     /// externally signed data from keys that don't live on Prism.
     signed_data: Vec<SignedData>,
-
-    /// The service challenge for the account, if it is a service.
-    service_challenge: Option<ServiceChallenge>,
 }
 
 impl Account {
@@ -63,10 +60,6 @@ impl Account {
 
     pub fn signed_data(&self) -> &[SignedData] {
         &self.signed_data
-    }
-
-    pub fn service_challenge(&self) -> Option<&ServiceChallenge> {
-        self.service_challenge.as_ref()
     }
 
     /// Creates a new request builder with the default NoopPrismApi implementation.

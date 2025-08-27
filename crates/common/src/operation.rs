@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::{self, fmt::Display};
 use utoipa::ToSchema;
 
-use prism_keys::{Signature, SigningKey, VerifyingKey};
+use prism_keys::{Signature, VerifyingKey};
 
 use prism_errors::OperationError;
 
@@ -20,13 +20,10 @@ pub enum Operation {
         /// Unique identifier for the account
         #[schema(example = "user123@prism.xyz")]
         id: String,
-        /// Identifier of the service this account belongs to
-        #[schema(example = "prism")]
-        service_id: String,
-        /// Challenge response required for account creation
-        challenge: ServiceChallengeInput,
         /// Public key associated with the account
+        //TODO(DID): Can be multiple keys
         key: VerifyingKey,
+        //TODO(DID): Add verification method, alsoKnownAs, and ATProtoPDS
     },
     #[schema(title = "AddKey")]
     /// Adds a key to an existing account.
@@ -61,31 +58,6 @@ impl SignatureBundle {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
-/// Input required to complete a challenge for account creation.
-pub enum ServiceChallengeInput {
-    /// Input required when meeting `ServiceChallenge::Signed`.
-    /// The provided signature will be verified using the corresponding key from the challenge.
-    #[schema(title = "Signed")]
-    Signed(Signature),
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
-/// A challenge that must be met with valid corresponding `ServiceChallengeInput`
-/// when creating an account.
-pub enum ServiceChallenge {
-    /// Challenge that requires the service to sign corresponding CreateAccount operations
-    /// such that the given key can be used to verify their signatures.
-    #[schema(title = "Signed")]
-    Signed(VerifyingKey),
-}
-
-impl From<SigningKey> for ServiceChallenge {
-    fn from(sk: SigningKey) -> Self {
-        ServiceChallenge::Signed(sk.into())
-    }
-}
-
 impl Operation {
     pub fn get_public_key(&self) -> Option<&VerifyingKey> {
         match self {
@@ -97,13 +69,9 @@ impl Operation {
 
     pub fn validate_basic(&self) -> Result<(), OperationError> {
         match &self {
-            Operation::CreateAccount { id, service_id, .. } => {
+            Operation::CreateAccount { id, .. } => {
                 if id.is_empty() {
                     return Err(OperationError::EmptyAccountId);
-                }
-
-                if service_id.is_empty() {
-                    return Err(OperationError::EmptyServiceIdForAccount);
                 }
 
                 Ok(())

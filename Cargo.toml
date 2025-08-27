@@ -56,7 +56,6 @@ members = [
   "crates/tree",
   "crates/zk/sp1",
   "crates/zk/sp1-builder",
-  "crates/zk/sp1-script",
 ]
 resolver = "2"
 

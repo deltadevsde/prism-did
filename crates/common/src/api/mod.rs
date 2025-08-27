@@ -14,9 +14,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{
-    account::Account, builder::RequestBuilder, operation::SignatureBundle, transaction::Transaction,
-};
+use crate::{account::Account, builder::RequestBuilder, transaction::Transaction};
 use types::{AccountResponse, CommitmentResponse};
 
 #[derive(Clone, Debug)]
@@ -82,22 +80,6 @@ where
         RequestBuilder::new_with_prism(self)
     }
 
-    async fn register_service(
-        &self,
-        id: String,
-        challenge_key: VerifyingKey,
-        signing_key: &SigningKey,
-    ) -> Result<impl PendingTransaction<Timer = Self::Timer>, PrismApiError> {
-        self.build_request()
-            .register_service()
-            .with_id(id)
-            .with_key(signing_key.verifying_key())
-            .requiring_signed_challenge(challenge_key)?
-            .sign(signing_key)?
-            .send()
-            .await
-    }
-
     async fn create_account(
         &self,
         id: String,
@@ -139,36 +121,6 @@ where
         self.build_request()
             .to_modify_account(account)
             .revoke_key(key)?
-            .sign(signing_key)?
-            .send()
-            .await
-    }
-
-    async fn add_data(
-        &self,
-        account: &Account,
-        data: Vec<u8>,
-        data_signature: SignatureBundle,
-        signing_key: &SigningKey,
-    ) -> Result<impl PendingTransaction<Timer = Self::Timer>, PrismApiError> {
-        self.build_request()
-            .to_modify_account(account)
-            .add_data(data, data_signature)?
-            .sign(signing_key)?
-            .send()
-            .await
-    }
-
-    async fn set_data(
-        &self,
-        account: &Account,
-        data: Vec<u8>,
-        data_signature: SignatureBundle,
-        signing_key: &SigningKey,
-    ) -> Result<impl PendingTransaction<Timer = Self::Timer>, PrismApiError> {
-        self.build_request()
-            .to_modify_account(account)
-            .set_data(data, data_signature)?
             .sign(signing_key)?
             .send()
             .await

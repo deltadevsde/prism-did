@@ -3,23 +3,13 @@ use std::{self, fmt::Display};
 use utoipa::ToSchema;
 
 use prism_keys::{Signature, SigningKey, VerifyingKey};
-use prism_serde::raw_or_b64;
 
 use prism_errors::OperationError;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[schema(
     title = "Operation",
-    description = "State transition operation in the system",
-    example = r#"{
-        "RegisterService": {
-            "id": "prism",
-            "creation_gate": {
-                "Signed": "pzK1LaZAJzxr9nfD5LIOYZxnk26eIOD74V8IS2ir05g"
-            },
-            "key": "DmzD4PQL-QuqbEmMd9lDpoGQOnU6eCJsGcyBNGL4GhQ"
-        }
-    }"#
+    description = "State transition operation in the system"
 )]
 /// An [`Operation`] represents a state transition in the system.
 /// In a blockchain analogy, this would be the full set of our transaction types.
@@ -37,37 +27,6 @@ pub enum Operation {
         challenge: ServiceChallengeInput,
         /// Public key associated with the account
         key: VerifyingKey,
-    },
-    #[schema(title = "RegisterService")]
-    /// Registers a new service with the given id.
-    RegisterService {
-        /// Unique identifier for the service
-        #[schema(example = "prism")]
-        id: String,
-        /// Creation gate that defines how accounts can be created for this service
-        creation_gate: ServiceChallenge,
-        /// Public key associated with the service
-        key: VerifyingKey,
-    },
-    #[schema(title = "AddData")]
-    /// Adds arbitrary signed data to an existing account.
-    AddData {
-        /// Raw data to be added to the account
-        #[serde(with = "raw_or_b64")]
-        #[schema(example = "dGVzdDEyMzQ=")]
-        data: Vec<u8>,
-        /// Bundle containing signature of the data and verification key
-        data_signature: SignatureBundle,
-    },
-    #[schema(title = "SetData")]
-    /// Set arbitrary signed data to an existing account. Replaces all existing data.
-    SetData {
-        /// Raw data to replace existing account data
-        #[serde(with = "raw_or_b64")]
-        #[schema(example = "eWFvbWluZzEyMw==")]
-        data: Vec<u8>,
-        /// Bundle containing signature of the data and verification key
-        data_signature: SignatureBundle,
     },
     #[schema(title = "AddKey")]
     /// Adds a key to an existing account.
@@ -132,21 +91,12 @@ impl Operation {
         match self {
             Operation::RevokeKey { key }
             | Operation::AddKey { key }
-            | Operation::CreateAccount { key, .. }
-            | Operation::RegisterService { key, .. } => Some(key),
-            Operation::AddData { .. } | Operation::SetData { .. } => None,
+            | Operation::CreateAccount { key, .. } => Some(key),
         }
     }
 
     pub fn validate_basic(&self) -> Result<(), OperationError> {
         match &self {
-            Operation::RegisterService { id, .. } => {
-                if id.is_empty() {
-                    return Err(OperationError::EmptyServiceId);
-                }
-
-                Ok(())
-            }
             Operation::CreateAccount { id, service_id, .. } => {
                 if id.is_empty() {
                     return Err(OperationError::EmptyAccountId);
@@ -159,15 +109,6 @@ impl Operation {
                 Ok(())
             }
             Operation::AddKey { .. } | Operation::RevokeKey { .. } => Ok(()),
-            Operation::AddData { data, .. } | Operation::SetData { data, .. } => {
-                let data_len = data.len();
-                // TODO determine proper max data size here
-                const MAX_DATA_SIZE: usize = 1_000_000; // 1MB limit for now
-                if data_len >= MAX_DATA_SIZE {
-                    return Err(OperationError::DataTooLarge(data_len));
-                }
-                Ok(())
-            }
         }
     }
 }

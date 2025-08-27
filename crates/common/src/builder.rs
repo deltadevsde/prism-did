@@ -29,10 +29,6 @@ where
         CreateAccountRequestBuilder::new(self.prism)
     }
 
-    pub fn register_service(self) -> RegisterServiceRequestBuilder<'a, P> {
-        RegisterServiceRequestBuilder::new(self.prism)
-    }
-
     pub fn to_modify_account(self, account: &Account) -> ModifyAccountRequestBuilder<'a, P> {
         ModifyAccountRequestBuilder::new(self.prism, account)
     }
@@ -160,33 +156,6 @@ where
         self.key = Some(key);
         self
     }
-
-    pub fn requiring_signed_challenge(
-        self,
-        challenge_key: VerifyingKey,
-    ) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
-        let Some(key) = self.key else {
-            return Err(TransactionError::MissingKey);
-        };
-
-        let operation = Operation::RegisterService {
-            id: self.id.clone(),
-            creation_gate: ServiceChallenge::Signed(challenge_key),
-            key,
-        };
-
-        operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
-
-        let unsigned_transaction = UnsignedTransaction {
-            id: self.id,
-            operation,
-            nonce: 0,
-        };
-        Ok(SigningTransactionRequestBuilder::new(
-            self.prism,
-            unsigned_transaction,
-        ))
-    }
 }
 
 pub struct ModifyAccountRequestBuilder<'a, P>
@@ -234,50 +203,6 @@ where
     ) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
         self.validate_id_and_nonce()?;
         let operation = Operation::RevokeKey { key };
-        operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
-        let unsigned_transaction = UnsignedTransaction {
-            id: self.id,
-            operation,
-            nonce: self.nonce,
-        };
-        Ok(SigningTransactionRequestBuilder::new(
-            self.prism,
-            unsigned_transaction,
-        ))
-    }
-
-    pub fn add_data(
-        self,
-        data: Vec<u8>,
-        data_signature: SignatureBundle,
-    ) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
-        self.validate_id_and_nonce()?;
-        let operation = Operation::AddData {
-            data,
-            data_signature,
-        };
-        operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
-        let unsigned_transaction = UnsignedTransaction {
-            id: self.id,
-            operation,
-            nonce: self.nonce,
-        };
-        Ok(SigningTransactionRequestBuilder::new(
-            self.prism,
-            unsigned_transaction,
-        ))
-    }
-
-    pub fn set_data(
-        self,
-        data: Vec<u8>,
-        data_signature: SignatureBundle,
-    ) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
-        self.validate_id_and_nonce()?;
-        let operation = Operation::SetData {
-            data,
-            data_signature,
-        };
         operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
         let unsigned_transaction = UnsignedTransaction {
             id: self.id,

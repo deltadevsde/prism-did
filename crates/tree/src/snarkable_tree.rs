@@ -91,10 +91,7 @@ where
 
     fn process_transaction(&mut self, transaction: Transaction) -> Result<Proof> {
         match &transaction.operation {
-            Operation::AddKey { .. }
-            | Operation::RevokeKey { .. }
-            | Operation::AddData { .. }
-            | Operation::SetData { .. } => {
+            Operation::AddKey { .. } | Operation::RevokeKey { .. } => {
                 let key_hash = KeyHash::with::<TreeHasher>(&transaction.id);
 
                 debug!("updating account for user id {}", transaction.id);
@@ -145,19 +142,6 @@ where
                 debug!("creating new account for user ID {}", id);
 
                 let insert_proof = self.insert(account_key_hash, transaction)?;
-                Ok(Proof::Insert(Box::new(insert_proof)))
-            }
-            Operation::RegisterService { id, .. } => {
-                ensure!(
-                    transaction.id == id.as_str(),
-                    "Id of transaction needs to be equal to operation id"
-                );
-
-                let key_hash = KeyHash::with::<TreeHasher>(id);
-
-                debug!("creating new account for service id {}", id);
-
-                let insert_proof = self.insert(key_hash, transaction)?;
                 Ok(Proof::Insert(Box::new(insert_proof)))
             }
         }

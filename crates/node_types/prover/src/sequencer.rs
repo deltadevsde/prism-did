@@ -181,13 +181,10 @@ impl Sequencer {
         }
 
         match transaction.operation {
-            Operation::RegisterService { .. } | Operation::CreateAccount { .. } => {
+            Operation::CreateAccount { .. } => {
                 Account::default().process_transaction(&transaction)?;
             }
-            Operation::AddKey { .. }
-            | Operation::RevokeKey { .. }
-            | Operation::AddData { .. }
-            | Operation::SetData { .. } => {
+            Operation::AddKey { .. } | Operation::RevokeKey { .. } => {
                 let account_response = self.get_account(&transaction.id).await?;
 
                 let Found(mut account, _) = account_response else {

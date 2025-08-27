@@ -116,8 +116,7 @@ impl Account {
         }
 
         match &tx.operation {
-            Operation::CreateAccount { id, key, .. }
-            | Operation::RegisterService { id, key, .. } => {
+            Operation::CreateAccount { id, key, .. } => {
                 if &tx.id != id {
                     return Err(AccountError::AccountIdError(
                         tx.id.to_string(),
@@ -161,23 +160,7 @@ impl Account {
                     return Err(anyhow!("Key does not exist"));
                 }
             }
-            Operation::AddData {
-                data,
-                data_signature,
-            }
-            | Operation::SetData {
-                data,
-                data_signature,
-            } => {
-                // we only need to do a single signature verification if the
-                // user signs transaction and data with their own key
-                if !self.valid_keys().contains(&data_signature.verifying_key) {
-                    data_signature
-                        .verifying_key
-                        .verify_signature(data, &data_signature.signature)?;
-                }
-            }
-            Operation::CreateAccount { .. } | Operation::RegisterService { .. } => {
+            Operation::CreateAccount { .. } => {
                 if !self.is_empty() {
                     return Err(anyhow!("Account already exists"));
                 }
@@ -198,36 +181,9 @@ impl Account {
             Operation::RevokeKey { key } => {
                 self.valid_keys.retain(|k| k != key);
             }
-            Operation::AddData {
-                data,
-                data_signature,
-            } => {
-                self.signed_data.push(SignedData {
-                    key: data_signature.verifying_key.clone(),
-                    data: data.clone(),
-                });
-            }
-            Operation::SetData {
-                data,
-                data_signature,
-            } => {
-                self.signed_data = vec![SignedData {
-                    key: data_signature.verifying_key.clone(),
-                    data: data.clone(),
-                }];
-            }
             Operation::CreateAccount { id, key, .. } => {
                 self.id = id.clone();
                 self.valid_keys.push(key.clone());
-            }
-            Operation::RegisterService {
-                id,
-                creation_gate,
-                key,
-            } => {
-                self.id = id.clone();
-                self.valid_keys.push(key.clone());
-                self.service_challenge = Some(creation_gate.clone());
             }
         }
 

@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{self, fmt::Display};
+use std::{self, collections::HashMap, fmt::Display};
 use utoipa::ToSchema;
 
 use prism_keys::{Signature, VerifyingKey};
@@ -21,9 +21,15 @@ pub enum Operation {
         #[schema(example = "user123@prism.xyz")]
         id: String,
         /// Public key associated with the account
-        //TODO(DID): Can be multiple keys
         key: VerifyingKey,
-        //TODO(DID): Add verification method, alsoKnownAs, and ATProtoPDS
+    },
+    #[schema(title = "CreateDID")]
+    CreateDID {
+        did: String,
+        verification_methods: HashMap<String, VerifyingKey>,
+        rotation_keys: Vec<VerifyingKey>,
+        also_known_as: Vec<String>,
+        atproto_pds: String,
     },
     #[schema(title = "AddKey")]
     /// Adds a key to an existing account.
@@ -64,6 +70,7 @@ impl Operation {
             Operation::RevokeKey { key }
             | Operation::AddKey { key }
             | Operation::CreateAccount { key, .. } => Some(key),
+            Operation::CreateDID { .. } => None,
         }
     }
 
@@ -71,6 +78,23 @@ impl Operation {
         match &self {
             Operation::CreateAccount { id, .. } => {
                 if id.is_empty() {
+                    return Err(OperationError::EmptyAccountId);
+                }
+
+                Ok(())
+            }
+            Operation::CreateDID {
+                verification_methods,
+                rotation_keys,
+                ..
+            } => {
+                // TODO(DID): Obviously placeholder validations, but they refer to the
+                // did-method-plc README.md
+                if verification_methods.len() > 10 {
+                    return Err(OperationError::DataTooLarge(10));
+                }
+
+                if rotation_keys.is_empty() {
                     return Err(OperationError::EmptyAccountId);
                 }
 

@@ -73,7 +73,54 @@ where
 
                 Ok(Proof::Update(Box::new(proof)))
             }
-            Operation::CreateAccount { id, key } => {
+            Operation::CreateDID {
+                did,
+                rotation_keys,
+                also_known_as,
+                verification_methods,
+                atproto_pds,
+                ..
+            } => {
+                ensure!(
+                    transaction.id == did.as_str(),
+                    "Id of transaction needs to be equal to operation id"
+                );
+
+                ensure!(
+                    rotation_keys.contains(&transaction.vk),
+                    "Transaction verification key is not a valid rotation key"
+                );
+
+                let account_key_hash = KeyHash::with::<TreeHasher>(did);
+
+                // Verify that the account doesn't already exist
+                if matches!(self.get(account_key_hash)?, Found(_, _)) {
+                    bail!(DatabaseError::NotFoundError(format!(
+                        "Account already exists for DID {}",
+                        did
+                    )));
+                }
+
+                // TODO(DID): Ensure hash is built from real JSON struct
+                let hash = Digest::hash_items(&[
+                    &did,
+                    //
+                    // &rotation_keys.(),
+                    // &also_known_as,
+                    // &verification_methods,
+                    &atproto_pds,
+                ]);
+
+                transaction.vk.verify_signature(hash, &transaction.signature)?;
+
+                // TODO(DID): Ensure did is built from valid hash
+
+                debug!("creating new DID for user ID {}", did);
+
+                let insert_proof = self.insert(account_key_hash, transaction)?;
+                Ok(Proof::Insert(Box::new(insert_proof)))
+            }
+            Operation::CreateAccount { id, .. } => {
                 ensure!(
                     transaction.id == id.as_str(),
                     "Id of transaction needs to be equal to operation id"
@@ -88,9 +135,6 @@ where
                         id
                     )));
                 }
-
-                // TODO(DID): key must now sign over a different object! Independent of some
-                // challenge
 
                 // let service_key_hash = KeyHash::with::<TreeHasher>(service_id);
 

@@ -52,14 +52,29 @@ pub struct Account {
 
     #[serde(rename = "alsoKnownAs")]
     also_known_as: Vec<String>,
+    /// Set of service / URL mappings. the key strings should not include a `#`
+    /// prefix; that will be added when rendering the DID document.
     services: HashMap<String, Service>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+
+/// TODO(DID): use an atproto_pds entry with an AtprotoPersonalDataServer type and
+/// http/https URL endpoint indicating the account's current PDS hostname.
+/// for example, https://pds.example.com (no /xrpc/ suffix needed)
 pub struct Service {
     #[serde(rename = "type")]
     pub service_type: String,
     pub endpoint: String,
+}
+
+impl Service {
+    pub fn new_pds(endpoint: String) -> Self {
+        Self {
+            service_type: "AtprotoPersonalDataServer".to_string(),
+            endpoint,
+        }
+    }
 }
 
 impl Account {
@@ -166,7 +181,7 @@ impl Account {
                     return Err(anyhow!("Key does not exist"));
                 }
             }
-            Operation::CreateAccount { .. } => {
+            Operation::CreateDID { .. } | Operation::CreateAccount { .. } => {
                 if !self.is_empty() {
                     return Err(anyhow!("Account already exists"));
                 }
@@ -186,6 +201,22 @@ impl Account {
             }
             Operation::RevokeKey { key } => {
                 self.rotation_keys.retain(|k| k != key);
+            }
+            Operation::CreateDID {
+                did,
+                verification_methods,
+                rotation_keys,
+                also_known_as,
+                atproto_pds,
+            } => {
+                self.did = did.clone();
+                self.also_known_as = also_known_as.clone();
+                self.rotation_keys = rotation_keys.clone();
+                self.verification_methods = verification_methods.clone();
+                self.services.insert(
+                    "atproto_pds".to_string(),
+                    Service::new_pds(atproto_pds.clone()),
+                );
             }
             Operation::CreateAccount { id, key, .. } => {
                 self.did = id.clone();

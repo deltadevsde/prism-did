@@ -181,7 +181,7 @@ impl Sequencer {
         }
 
         match transaction.operation {
-            Operation::CreateAccount { .. } => {
+            Operation::CreateDID { .. } | Operation::CreateAccount { .. } => {
                 Account::default().process_transaction(&transaction)?;
             }
             Operation::AddKey { .. } | Operation::RevokeKey { .. } => {

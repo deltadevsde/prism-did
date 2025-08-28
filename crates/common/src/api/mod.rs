@@ -60,6 +60,7 @@ impl From<anyhow::Error> for PrismApiError {
     }
 }
 
+// TODO(DID): Implement new op type
 #[async_trait]
 pub trait PrismApi
 where

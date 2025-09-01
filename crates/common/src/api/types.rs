@@ -57,3 +57,60 @@ impl Default for HashedMerkleProof {
         Self::empty()
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+/// A verification method in a DID document
+pub struct VerificationMethod {
+    /// The verification method identifier
+    pub id: String,
+    /// The type of verification method
+    #[serde(rename = "type")]
+    pub method_type: String,
+    /// The controller of the verification method
+    pub controller: String,
+    /// The public key in multibase format
+    #[serde(rename = "publicKeyMultibase")]
+    pub public_key_multibase: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+/// A service endpoint in a DID document
+pub struct DidService {
+    /// The service identifier
+    pub id: String,
+    /// The type of service
+    #[serde(rename = "type")]
+    pub service_type: String,
+    /// The service endpoint URL
+    #[serde(rename = "serviceEndpoint")]
+    pub service_endpoint: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+/// A complete DID document
+pub struct DidDocument {
+    /// The JSON-LD context
+    #[serde(rename = "@context")]
+    pub context: Vec<String>,
+    /// The DID identifier
+    pub id: String,
+    /// Alternative identifiers for the DID subject
+    #[serde(rename = "alsoKnownAs")]
+    pub also_known_as: Vec<String>,
+    /// Verification methods
+    #[serde(rename = "verificationMethod")]
+    pub verification_method: Vec<VerificationMethod>,
+    /// Services
+    pub service: Vec<DidService>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+/// Response containing account data, Merkle proof, and DID document
+pub struct AccountDidResponse {
+    /// The account if found, or None if not found
+    pub account: Option<Account>,
+    /// Merkle proof for account membership or non-membership
+    pub proof: HashedMerkleProof,
+    /// The DID document derived from the account
+    pub did_document: Option<DidDocument>,
+}

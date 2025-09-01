@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
+use bs58;
 use prism_errors::AccountError;
 use prism_keys::VerifyingKey;
 use prism_serde::raw_or_b64;
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    api::{PrismApi, noop::NoopPrismApi},
+    api::{PrismApi, noop::NoopPrismApi, types::{DidDocument, VerificationMethod, DidService}},
     builder::{ModifyAccountRequestBuilder, RequestBuilder},
     operation::Operation,
     transaction::Transaction,
@@ -229,5 +230,63 @@ impl Account {
 
     pub fn is_empty(&self) -> bool {
         self.nonce == 0
+    }
+
+    pub fn verification_methods(&self) -> &HashMap<String, VerifyingKey> {
+        &self.verification_methods
+    }
+
+    pub fn also_known_as(&self) -> &[String] {
+        &self.also_known_as
+    }
+
+    pub fn services(&self) -> &HashMap<String, Service> {
+        &self.services
+    }
+}
+
+impl From<&Account> for DidDocument {
+    fn from(account: &Account) -> Self {
+        let context = vec![
+            "https://www.w3.org/ns/did/v1".to_string(),
+            "https://w3id.org/security/multikey/v1".to_string(),
+        ];
+
+        let verification_methods: Vec<VerificationMethod> = account.verification_methods
+            .iter()
+            .map(|(key_id, verifying_key)| {
+                let public_key_multibase = match verifying_key.to_did() {
+                    Ok(did_key) => did_key.strip_prefix("did:key:").unwrap_or(&did_key).to_string(),
+                    Err(_) => {
+                        // Fallback to raw key representation if DID conversion fails
+                        format!("z{}", bs58::encode(verifying_key.to_bytes()).into_string())
+                    }
+                };
+
+                VerificationMethod {
+                    id: format!("{}#{}", account.did, key_id),
+                    method_type: "Multikey".to_string(),
+                    controller: account.did.clone(),
+                    public_key_multibase,
+                }
+            })
+            .collect();
+
+        let services: Vec<DidService> = account.services
+            .iter()
+            .map(|(service_id, service)| DidService {
+                id: format!("#{}", service_id),
+                service_type: service.service_type.clone(),
+                service_endpoint: service.endpoint.clone(),
+            })
+            .collect();
+
+        DidDocument {
+            context,
+            id: account.did.clone(),
+            also_known_as: account.also_known_as.clone(),
+            verification_method: verification_methods,
+            service: services,
+        }
     }
 }

@@ -4,7 +4,7 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use prism_common::{
     api::{
         PrismApi,
-        types::{AccountRequest, AccountResponse, CommitmentResponse},
+        types::{AccountRequest, AccountResponse, AccountDidResponse, CommitmentResponse, DidDocument},
     },
     transaction::Transaction,
 };
@@ -13,6 +13,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::CorsLayer;
+use tracing::{info, warn, error};
 use utoipa::{
     OpenApi,
     openapi::{Info, OpenApiBuilder},
@@ -69,6 +70,7 @@ impl WebServer {
 
         let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
             .routes(routes!(get_account))
+            .routes(routes!(get_did_document))
             .routes(routes!(post_transaction))
             .routes(routes!(get_commitment))
             .layer(CorsLayer::permissive())
@@ -165,6 +167,56 @@ async fn get_account(
     };
 
     (StatusCode::OK, Json(account_response)).into_response()
+}
+
+/// The /get-did-document endpoint returns account information along with its corresponding DID document.
+///
+/// If the ID is not found in the database, the endpoint will return a 400 response with the message
+/// "Could not calculate values". The DID document is only generated if an account exists.
+#[utoipa::path(
+    post,
+    path = "/get-did-document",
+    request_body = AccountRequest,
+    responses(
+        (status = 200, description = "Successfully retrieved account and DID document", body = AccountDidResponse),
+        (status = 400, description = "Bad request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn get_did_document(
+    State(session): State<Arc<Prover>>,
+    Json(request): Json<AccountRequest>,
+) -> impl IntoResponse {
+    info!("Retrieving DID document for account ID: {}", request.id);
+
+    let account_response = match session.get_account(&request.id).await {
+        Ok(response) => response,
+        Err(e) => {
+            error!("Failed to retrieve account for DID document: {}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to retrieve account or non-membership-proof: {}", e),
+            )
+                .into_response();
+        }
+    };
+
+    let did_document = if let Some(ref account) = account_response.account {
+        info!("Generating DID document for account: {}", account.id());
+        Some(DidDocument::from(account))
+    } else {
+        warn!("No account found for ID {}, returning None for DID document", request.id);
+        None
+    };
+
+    let response = AccountDidResponse {
+        account: account_response.account,
+        proof: account_response.proof,
+        did_document,
+    };
+
+    info!("Successfully generated DID document response for ID: {}", request.id);
+    (StatusCode::OK, Json(response)).into_response()
 }
 
 /// Returns the commitment (tree root) of the `IndexedMerkleTree` initialized from the database.

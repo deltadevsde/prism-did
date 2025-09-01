@@ -45,6 +45,30 @@ pub enum Operation {
     },
 }
 
+// TODO(DID): obv rename + add verification etc
+pub struct PLCOp {
+    #[serde(rename = "verificationMethods")]
+    verification_methods: HashMap<String, String>,
+    #[serde(rename = "rotationKeys")]
+    rotation_keys: Vec<String>,
+    #[serde(rename = "alsoKnownAs")]
+    also_known_as: Vec<String>,
+    #[serde(rename = "type")]
+    op_type: String,
+    services: HashMap<String, Service>,
+    prev: Option<String>,
+}
+
+pub struct Service {
+    #[serde(rename = "type")]
+    op_type: String,
+    endpoint: String,
+}
+
+impl PLCOp {
+    fn to_did() -> Result<String> {}
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 /// Represents a signature and the key to verify it.
 pub struct SignatureBundle {

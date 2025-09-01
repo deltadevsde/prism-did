@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use prism_errors::TransactionError;
 use prism_keys::{SigningKey, VerifyingKey};
+use prism_serde::binary::ToBinary;
 
 use crate::{
     account::Account,
@@ -31,6 +34,10 @@ where
 
     pub fn to_modify_account(self, account: &Account) -> ModifyAccountRequestBuilder<'a, P> {
         ModifyAccountRequestBuilder::new(self.prism, account)
+    }
+
+    pub fn create_did(self) -> CreateDIDRequestBuilder<'a, P> {
+        CreateDIDRequestBuilder::new(self.prism)
     }
 
     pub fn continue_transaction(
@@ -124,35 +131,130 @@ where
     }
 }
 
-pub struct RegisterServiceRequestBuilder<'a, P>
+pub struct CreateDIDRequestBuilder<'a, P>
 where
     P: PrismApi,
 {
     prism: Option<&'a P>,
-    id: String,
-    key: Option<VerifyingKey>,
+    did: String,
+    verification_methods: HashMap<String, VerifyingKey>,
+    rotation_keys: Vec<VerifyingKey>,
+    also_known_as: Vec<String>,
+    atproto_pds: String,
+}
+// TODO(DID): not okay
+fn encode_base32(data: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+    if data.is_empty() {
+        return String::new();
+    }
+
+    let mut result = String::new();
+    let mut buffer = 0u64;
+    let mut bits_in_buffer = 0;
+
+    for &byte in data {
+        buffer = (buffer << 8) | byte as u64;
+        bits_in_buffer += 8;
+
+        // Extract 5-bit chunks from the buffer
+        while bits_in_buffer >= 5 {
+            let index = ((buffer >> (bits_in_buffer - 5)) & 0x1F) as usize;
+            result.push(ALPHABET[index] as char);
+            bits_in_buffer -= 5;
+        }
+    }
+
+    // Handle remaining bits
+    if bits_in_buffer > 0 {
+        let index = ((buffer << (5 - bits_in_buffer)) & 0x1F) as usize;
+        result.push(ALPHABET[index] as char);
+    }
+
+    // Add padding
+    while result.len().is_multiple_of(8) {
+        result.push('=');
+    }
+
+    result
 }
 
-impl<'a, P> RegisterServiceRequestBuilder<'a, P>
+impl<'a, P> CreateDIDRequestBuilder<'a, P>
 where
     P: PrismApi,
 {
     pub fn new(prism: Option<&'a P>) -> Self {
         Self {
             prism,
-            id: String::new(),
-            key: None,
+            did: String::new(),
+            verification_methods: HashMap::new(),
+            rotation_keys: Vec::new(),
+            also_known_as: Vec::new(),
+            atproto_pds: String::new(),
         }
     }
 
-    pub fn with_id(mut self, id: String) -> Self {
-        self.id = id;
+    pub fn with_verification_method(mut self, id: String, key: VerifyingKey) -> Self {
+        self.verification_methods.insert(id, key);
         self
     }
 
-    pub fn with_key(mut self, key: VerifyingKey) -> Self {
-        self.key = Some(key);
+    pub fn with_rotation_keys(mut self, keys: Vec<VerifyingKey>) -> Self {
+        self.rotation_keys = keys;
         self
+    }
+
+    pub fn with_also_known_as(mut self, alias: String) -> Self {
+        self.also_known_as.push(alias);
+        self
+    }
+
+    pub fn with_atproto_pds(mut self, pds: String) -> Self {
+        self.atproto_pds = pds;
+        self
+    }
+
+    // TODO(DID): atrocious, hacky rust
+    pub fn build(self) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
+        let operation = Operation::CreateDID {
+            did: "".to_string(),
+            verification_methods: self.verification_methods.clone(),
+            rotation_keys: self.rotation_keys.clone(),
+            also_known_as: self.also_known_as.clone(),
+            atproto_pds: self.atproto_pds.clone(),
+        };
+
+        let op_hash = Digest::hash(
+            &operation
+                // TODO(DID): This actually needs to be encoded to hex or smth
+                .encode_to_bytes()
+                .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?,
+        );
+
+        let mut b32 = encode_base32(op_hash.as_bytes());
+        b32.split_off(24);
+        let did = format!("did:prism:{}", b32);
+
+        let operation = Operation::CreateDID {
+            did: did.clone(),
+            verification_methods: self.verification_methods,
+            rotation_keys: self.rotation_keys,
+            also_known_as: self.also_known_as,
+            atproto_pds: self.atproto_pds,
+        };
+
+        operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
+
+        let unsigned_transaction = UnsignedTransaction {
+            id: self.did,
+            operation,
+            nonce: 0,
+        };
+        Ok(SigningTransactionRequestBuilder::new(
+            self.prism,
+            unsigned_transaction,
+        ))
     }
 }
 

@@ -113,6 +113,27 @@ where
             .await
     }
 
+    async fn create_did(
+        &self,
+        verification_method: VerifyingKey,
+        rotation_keys: Vec<VerifyingKey>,
+        also_known_as: String,
+        atproto_pds: String,
+        signing_key: &SigningKey,
+    ) -> Result<impl PendingTransaction<Timer = Self::Timer>, PrismApiError> {
+        //TODO(DID): assert signing_key in rotation_keys
+        self.build_request()
+            .create_did()
+            .with_also_known_as(also_known_as)
+            .with_verification_method("atproto".to_string(), verification_method)
+            .with_atproto_pds(atproto_pds)
+            .with_rotation_keys(rotation_keys)
+            .build()?
+            .sign(signing_key)?
+            .send()
+            .await
+    }
+
     async fn revoke_key(
         &self,
         account: &Account,

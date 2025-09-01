@@ -189,6 +189,30 @@ impl VerifyingKey {
         }
     }
 
+    // TODO(DID): DIDKey can be own type, this should be a From impl
+    /// Converts the verifying key to a DID string, only supports Ed25519 and P256.
+    fn to_did(&self) -> Result<String> {
+        let prefix = String::from("did:key:");
+        match self {
+            VerifyingKey::Ed25519(vk) => {
+                let codec: &[u8] = &[0xed, 0x1];
+                let data = [codec, vk.as_bytes()].concat();
+                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+            }
+            VerifyingKey::Secp256r1(vk) => {
+                let codec: &[u8] = &[0x80, 0x24];
+                let data = [codec, vk.to_encoded_point(true).as_ref()].concat();
+                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+            }
+            _ => Err(CryptoError::VerificationError(
+                VerificationError::NotImplementedError(
+                    "Unsupported key type".to_string(),
+                    "to_did".to_string(),
+                ),
+            )),
+        }
+    }
+
     fn to_spki_der_doc(&self) -> Result<Document> {
         match self {
             VerifyingKey::Ed25519(vk) => Ed25519PublicKeyBytes(vk.to_bytes()).to_public_key_der(),

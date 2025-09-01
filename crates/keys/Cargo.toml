@@ -8,6 +8,7 @@ repository.workspace = true
 
 [dependencies]
 # serde
+bs58 = "0.4.0"
 pkcs8.workspace = true
 prism-serde.workspace = true
 serde.workspace = true

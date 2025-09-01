@@ -191,7 +191,7 @@ impl VerifyingKey {
 
     // TODO(DID): DIDKey can be own type, this should be a From impl
     /// Converts the verifying key to a DID string, only supports Ed25519 and P256.
-    fn to_did(&self) -> Result<String> {
+    pub fn to_did(&self) -> Result<String> {
         let prefix = String::from("did:key:");
         match self {
             VerifyingKey::Ed25519(vk) => {
@@ -208,6 +208,70 @@ impl VerifyingKey {
                 VerificationError::NotImplementedError(
                     "Unsupported key type".to_string(),
                     "to_did".to_string(),
+                ),
+            )),
+        }
+    }
+
+    /// Parses a DID string into a verifying key, only supports Ed25519 and P256.
+    pub fn from_did(did: &str) -> Result<Self> {
+        let prefix = "did:key:z";
+        if !did.starts_with(prefix) {
+            return Err(CryptoError::ParseError(ParseError::GeneralError(
+                format!("Invalid DID format: expected '{prefix}...' but got '{did}'"),
+            )));
+        }
+
+        let encoded = &did[prefix.len()..];
+        let decoded = bs58::decode(encoded)
+            .into_vec()
+            .map_err(|e| CryptoError::ParseError(ParseError::GeneralError(
+                format!("Failed to decode base58: {e}")
+            )))?;
+
+        if decoded.len() < 2 {
+            return Err(CryptoError::ParseError(ParseError::GeneralError(
+                "Decoded data too short to contain codec".to_string(),
+            )));
+        }
+
+        match &decoded[0..2] {
+            [0xed, 0x1] => {
+                // Ed25519
+                if decoded.len() != 34 {  // 2-byte codec + 32-byte key
+                    return Err(CryptoError::ParseError(ParseError::GeneralError(
+                        format!("Invalid Ed25519 key length: expected 34 bytes, got {}", decoded.len())
+                    )));
+                }
+                let key_bytes = &decoded[2..];
+                let vk = Ed25519VerifyingKey::try_from(key_bytes).map_err(|e| {
+                    CryptoError::VerificationError(VerificationError::VerifyError(
+                        "ed25519".to_string(),
+                        e.to_string(),
+                    ))
+                })?;
+                Ok(VerifyingKey::Ed25519(vk))
+            }
+            [0x80, 0x24] => {
+                // Secp256r1
+                if decoded.len() != 35 {  // 2-byte codec + 33-byte compressed key
+                    return Err(CryptoError::ParseError(ParseError::GeneralError(
+                        format!("Invalid Secp256r1 key length: expected 35 bytes, got {}", decoded.len())
+                    )));
+                }
+                let key_bytes = &decoded[2..];
+                let vk = Secp256r1VerifyingKey::from_sec1_bytes(key_bytes).map_err(|e| {
+                    CryptoError::VerificationError(VerificationError::VerifyError(
+                        "secp256r1".to_string(),
+                        e.to_string(),
+                    ))
+                })?;
+                Ok(VerifyingKey::Secp256r1(vk))
+            }
+            _ => Err(CryptoError::VerificationError(
+                VerificationError::NotImplementedError(
+                    format!("Unsupported codec: {:02x}{:02x}", decoded[0], decoded[1]),
+                    "from_did".to_string(),
                 ),
             )),
         }
@@ -371,7 +435,11 @@ impl TryFrom<String> for VerifyingKey {
     type Error = CryptoError;
 
     fn try_from(s: String) -> std::result::Result<Self, Self::Error> {
-        Self::from_base64(s)
+        if s.starts_with("did:key:") {
+            Self::from_did(&s)
+        } else {
+            Self::from_base64(s)
+        }
     }
 }
 

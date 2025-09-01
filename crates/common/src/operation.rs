@@ -45,29 +45,78 @@ pub enum Operation {
     },
 }
 
+/*
+export const addSignature = async <T extends Record<string, unknown>>(
+  object: T,
+  key: Keypair,
+): Promise<T & { sig: string }> => {
+  const data = new Uint8Array(cbor.encode(object))
+  const sig = await key.sign(data)
+  return {
+    ...object,
+    sig: uint8arrays.toString(sig, 'base64url'),
+  }
+}
+
+export const formatAtprotoOp = (opts: {
+  signingKey: string
+  handle: string
+  pds: string
+  rotationKeys: string[]
+  prev: CID | null
+}): t.UnsignedOperation => {
+  return {
+    type: 'plc_operation',
+    verificationMethods: {
+      atproto: opts.signingKey,
+    },
+    rotationKeys: opts.rotationKeys,
+    alsoKnownAs: [ensureAtprotoPrefix(opts.handle)],
+    services: {
+      atproto_pds: {
+        type: 'AtprotoPersonalDataServer',
+        endpoint: ensureHttpPrefix(opts.pds),
+      },
+    },
+    prev: opts.prev?.toString() ?? null,
+  }
+}
+
+export const atprotoOp = async (opts: {
+  signingKey: string
+  handle: string
+  pds: string
+  rotationKeys: string[]
+  prev: CID | null
+  signer: Keypair
+}) => {
+  return addSignature(formatAtprotoOp(opts), opts.signer)
+}
+*/
+
 // TODO(DID): obv rename + add verification etc
-pub struct PLCOp {
-    #[serde(rename = "verificationMethods")]
-    verification_methods: HashMap<String, String>,
-    #[serde(rename = "rotationKeys")]
-    rotation_keys: Vec<String>,
-    #[serde(rename = "alsoKnownAs")]
-    also_known_as: Vec<String>,
-    #[serde(rename = "type")]
-    op_type: String,
-    services: HashMap<String, Service>,
-    prev: Option<String>,
-}
+// pub struct PLCOp {
+//     #[serde(rename = "verificationMethods")]
+//     verification_methods: HashMap<String, String>,
+//     #[serde(rename = "rotationKeys")]
+//     rotation_keys: Vec<String>,
+//     #[serde(rename = "alsoKnownAs")]
+//     also_known_as: Vec<String>,
+//     #[serde(rename = "type")]
+//     op_type: String,
+//     services: HashMap<String, Service>,
+//     prev: Option<String>,
+// }
 
-pub struct Service {
-    #[serde(rename = "type")]
-    op_type: String,
-    endpoint: String,
-}
+// pub struct Service {
+//     #[serde(rename = "type")]
+//     op_type: String,
+//     endpoint: String,
+// }
 
-impl PLCOp {
-    fn to_did() -> Result<String> {}
-}
+// impl PLCOp {
+//     fn to_did() -> Result<String> {}
+// }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 /// Represents a signature and the key to verify it.

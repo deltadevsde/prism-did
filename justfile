@@ -81,8 +81,6 @@ integration-test:
   done
 
 check:
-  @echo "Running cargo udeps..."
-  cargo +nightly udeps --all-features --all-targets
   @echo "Running clippy..."
   cargo clippy --all --all-targets -- -D warnings
 

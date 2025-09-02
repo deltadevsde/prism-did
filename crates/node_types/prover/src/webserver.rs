@@ -4,7 +4,9 @@ use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use prism_common::{
     api::{
         PrismApi,
-        types::{AccountRequest, AccountResponse, AccountDidResponse, CommitmentResponse, DidDocument},
+        types::{
+            AccountDidResponse, AccountRequest, AccountResponse, CommitmentResponse, DidDocument,
+        },
     },
     transaction::Transaction,
 };
@@ -13,7 +15,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use utoipa::{
     OpenApi,
     openapi::{Info, OpenApiBuilder},
@@ -169,7 +171,8 @@ async fn get_account(
     (StatusCode::OK, Json(account_response)).into_response()
 }
 
-/// The /get-did-document endpoint returns account information along with its corresponding DID document.
+/// The /get-did-document endpoint returns account information along with its corresponding DID
+/// document.
 ///
 /// If the ID is not found in the database, the endpoint will return a 400 response with the message
 /// "Could not calculate values". The DID document is only generated if an account exists.
@@ -205,7 +208,10 @@ async fn get_did_document(
         info!("Generating DID document for account: {}", account.id());
         Some(DidDocument::from(account))
     } else {
-        warn!("No account found for ID {}, returning None for DID document", request.id);
+        warn!(
+            "No account found for ID {}, returning None for DID document",
+            request.id
+        );
         None
     };
 
@@ -215,7 +221,10 @@ async fn get_did_document(
         did_document,
     };
 
-    info!("Successfully generated DID document response for ID: {}", request.id);
+    info!(
+        "Successfully generated DID document response for ID: {}",
+        request.id
+    );
     (StatusCode::OK, Json(response)).into_response()
 }
 

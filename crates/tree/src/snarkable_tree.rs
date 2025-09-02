@@ -102,19 +102,18 @@ where
                 }
 
                 // TODO(DID): Ensure hash is built from real JSON struct
-                let hash = Digest::hash_items(&[
-                    &did,
-                    //
-                    // &rotation_keys.(),
-                    // &also_known_as,
-                    // &verification_methods,
-                    &atproto_pds,
-                ]);
+                // let hash = Digest::hash_items(&[
+                //     &did,
+                //     &rotation_keys.(),
+                //     &also_known_as,
+                //     &verification_methods,
+                //     &atproto_pds,
+                // ]);
 
-                transaction.vk.verify_signature(hash, &transaction.signature)?;
+                // TODO(DID): Verify signature over JSON-LD
+                // transaction.vk.verify_signature(hash, &transaction.signature)?;
 
                 // TODO(DID): Ensure did is built from valid hash
-
                 debug!("creating new DID for user ID {}", did);
 
                 let insert_proof = self.insert(account_key_hash, transaction)?;

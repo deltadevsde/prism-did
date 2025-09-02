@@ -14,7 +14,7 @@ use prism_da::{
     create_full_node_da_layer, create_light_client_da_layer,
     memory::InMemoryDataAvailabilityLayer,
 };
-use prism_keys::{CryptoAlgorithm, SigningKey};
+use prism_keys::{CryptoAlgorithm, SigningKey, VerifyingKey};
 use prism_lightclient::LightClient;
 use prism_prover::{
     Prover, ProverEngineOptions, ProverOptions, SequencerOptions, SyncerOptions, WebServerConfig,
@@ -60,6 +60,8 @@ async fn test_light_client_prover_talking() -> Result<()> {
 
     let bridge_cfg = FullNodeDAConfig::InMemory;
 
+    // VerifyingKey::try_from("did:key:zQ3shkuYr2wT19g3jMGfrZLVMVq9FpzvNyUc2zEWkKpg5eYjz".
+    // to_string())     .expect("couldn't decode vk");
     // let bridge_cfg = FullNodeDAConfig::Celestia(CelestiaFullNodeDAConfig {
     //     url: "ws://localhost:26658".to_string(),
     //     ..CelestiaFullNodeDAConfig::default()

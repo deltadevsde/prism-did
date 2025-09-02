@@ -204,6 +204,11 @@ impl VerifyingKey {
                 let data = [codec, vk.to_encoded_point(true).as_ref()].concat();
                 Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
             }
+            VerifyingKey::Secp256k1(vk) => {
+                let codec: &[u8] = &[0xe7, 0x1];
+                let data = [codec, vk.to_encoded_point(true).as_ref()].concat();
+                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+            }
             _ => Err(CryptoError::VerificationError(
                 VerificationError::NotImplementedError(
                     "Unsupported key type".to_string(),
@@ -217,17 +222,17 @@ impl VerifyingKey {
     pub fn from_did(did: &str) -> Result<Self> {
         let prefix = "did:key:z";
         if !did.starts_with(prefix) {
-            return Err(CryptoError::ParseError(ParseError::GeneralError(
-                format!("Invalid DID format: expected '{prefix}...' but got '{did}'"),
-            )));
+            return Err(CryptoError::ParseError(ParseError::GeneralError(format!(
+                "Invalid DID format: expected '{prefix}...' but got '{did}'"
+            ))));
         }
 
         let encoded = &did[prefix.len()..];
-        let decoded = bs58::decode(encoded)
-            .into_vec()
-            .map_err(|e| CryptoError::ParseError(ParseError::GeneralError(
-                format!("Failed to decode base58: {e}")
-            )))?;
+        let decoded = bs58::decode(encoded).into_vec().map_err(|e| {
+            CryptoError::ParseError(ParseError::GeneralError(format!(
+                "Failed to decode base58: {e}"
+            )))
+        })?;
 
         if decoded.len() < 2 {
             return Err(CryptoError::ParseError(ParseError::GeneralError(
@@ -238,10 +243,12 @@ impl VerifyingKey {
         match &decoded[0..2] {
             [0xed, 0x1] => {
                 // Ed25519
-                if decoded.len() != 34 {  // 2-byte codec + 32-byte key
-                    return Err(CryptoError::ParseError(ParseError::GeneralError(
-                        format!("Invalid Ed25519 key length: expected 34 bytes, got {}", decoded.len())
-                    )));
+                if decoded.len() != 34 {
+                    // 2-byte codec + 32-byte key
+                    return Err(CryptoError::ParseError(ParseError::GeneralError(format!(
+                        "Invalid Ed25519 key length: expected 34 bytes, got {}",
+                        decoded.len()
+                    ))));
                 }
                 let key_bytes = &decoded[2..];
                 let vk = Ed25519VerifyingKey::try_from(key_bytes).map_err(|e| {
@@ -254,10 +261,12 @@ impl VerifyingKey {
             }
             [0x80, 0x24] => {
                 // Secp256r1
-                if decoded.len() != 35 {  // 2-byte codec + 33-byte compressed key
-                    return Err(CryptoError::ParseError(ParseError::GeneralError(
-                        format!("Invalid Secp256r1 key length: expected 35 bytes, got {}", decoded.len())
-                    )));
+                if decoded.len() != 35 {
+                    // 2-byte codec + 33-byte compressed key
+                    return Err(CryptoError::ParseError(ParseError::GeneralError(format!(
+                        "Invalid Secp256r1 key length: expected 35 bytes, got {}",
+                        decoded.len()
+                    ))));
                 }
                 let key_bytes = &decoded[2..];
                 let vk = Secp256r1VerifyingKey::from_sec1_bytes(key_bytes).map_err(|e| {
@@ -267,6 +276,17 @@ impl VerifyingKey {
                     ))
                 })?;
                 Ok(VerifyingKey::Secp256r1(vk))
+            }
+            [0xe7, 0x1] => {
+                //TODO(DID): len check
+                let key_bytes = &decoded[2..];
+                let vk = Secp256k1VerifyingKey::from_sec1_bytes(key_bytes).map_err(|e| {
+                    CryptoError::VerificationError(VerificationError::VerifyError(
+                        "secp256k1".to_string(),
+                        e.to_string(),
+                    ))
+                })?;
+                Ok(VerifyingKey::Secp256k1(vk))
             }
             _ => Err(CryptoError::VerificationError(
                 VerificationError::NotImplementedError(

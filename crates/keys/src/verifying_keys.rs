@@ -17,11 +17,12 @@ use pkcs8::{
     Document, LineEnding, SubjectPublicKeyInfoRef,
     der::{Decode, pem::PemLabel},
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use sha2::Digest as _;
 use std::{
     self,
     borrow::Cow,
+    fmt,
     hash::{Hash, Hasher},
     path::Path,
 };
@@ -35,6 +36,37 @@ use crate::{
     payload::CryptoPayload,
 };
 use prism_serde::base64::{FromBase64, ToBase64};
+
+/*
+* #[serde(deserialize_with = "path")]
+Deserialize this field using a function that is different from its implementation of Deserialize. The given function must be callable as fn<'de, D>(D) -> Result<T, D::Error> where D: Deserializer<'de>, although it may also be generic over T. Fields used with deserialize_with are not required to implement Deserialize.
+*/
+
+pub fn deserialize_from_did_str<'de, D>(
+    deserializer: D,
+) -> std::result::Result<VerifyingKey, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct DIDStringVisitor;
+
+    impl<'de> de::Visitor<'de> for DIDStringVisitor {
+        type Value = VerifyingKey;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a string containing json data")
+        }
+
+        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+        where
+            E: de::Error,
+        {
+            VerifyingKey::from_did(v).map_err(|e| E::custom(e))
+        }
+    }
+
+    deserializer.deserialize_any(DIDStringVisitor)
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(try_from = "CryptoPayload", into = "CryptoPayload")]

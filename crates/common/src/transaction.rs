@@ -1,6 +1,6 @@
 use celestia_types::Blob;
 use prism_errors::TransactionError;
-use prism_keys::{Signature, SigningKey, VerifyingKey};
+use prism_keys::{Signature, SigningKey, VerifyingKey, deserialize_from_did_str};
 use prism_serde::binary::{FromBinary, ToBinary};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -66,6 +66,7 @@ pub struct Transaction {
     pub signature: Signature,
     /// The verifying key of the signer of this transaction. This vk must be
     /// included in the account's valid_keys set.
+    // #[serde(deserialize_with = "deserialize_from_did_str")]
     pub vk: VerifyingKey,
 }
 

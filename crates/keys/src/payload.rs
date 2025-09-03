@@ -2,7 +2,7 @@ use prism_serde::raw_or_b64;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::CryptoAlgorithm;
+use crate::{CryptoAlgorithm, VerifyingKey};
 
 #[derive(Serialize, Deserialize, ToSchema)]
 /// Data structure containing a cryptographic payload with algorithm and bytes
@@ -16,4 +16,15 @@ pub struct CryptoPayload {
         example = "jMaZEeHpjIrpO33dkS223jPhurSFixoDJUzNWBAiZKA")]
     #[serde(with = "raw_or_b64")]
     pub bytes: Vec<u8>,
+}
+
+impl TryFrom<String> for CryptoPayload {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let vk = VerifyingKey::from_did(&value)
+            .expect("Failed to parse VerifyingKey from CryptoPayload");
+
+        Ok(vk.into())
+    }
 }

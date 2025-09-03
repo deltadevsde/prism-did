@@ -9,7 +9,11 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    api::{PrismApi, noop::NoopPrismApi, types::{DidDocument, VerificationMethod, DidService}},
+    api::{
+        PrismApi,
+        noop::NoopPrismApi,
+        types::{DidDocument, DidService, VerificationMethod},
+    },
     builder::{ModifyAccountRequestBuilder, RequestBuilder},
     operation::Operation,
     transaction::Transaction,
@@ -34,15 +38,12 @@ pub struct SignedData {
 /// tree.
 pub struct Account {
     /// The unique identifier for the account.
-    // TODO(DID): Make Did type that has verification, also the did should be hash over self
     // without the did
     did: String,
 
     /// The transaction nonce for the account.
-    // TODO(DID): This is not included in the PLC spec, do we need to modify it in any way?
     nonce: u64,
 
-    // TODO(DID): Implement conversion from VerifyingKey to DID format.
     #[serde(rename = "verificationMethods")]
     verification_methods: HashMap<String, VerifyingKey>,
 
@@ -59,10 +60,6 @@ pub struct Account {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-
-/// TODO(DID): use an atproto_pds entry with an AtprotoPersonalDataServer type and
-/// http/https URL endpoint indicating the account's current PDS hostname.
-/// for example, https://pds.example.com (no /xrpc/ suffix needed)
 pub struct Service {
     #[serde(rename = "type")]
     pub service_type: String,
@@ -252,7 +249,8 @@ impl From<&Account> for DidDocument {
             "https://w3id.org/security/multikey/v1".to_string(),
         ];
 
-        let verification_methods: Vec<VerificationMethod> = account.verification_methods
+        let verification_methods: Vec<VerificationMethod> = account
+            .verification_methods
             .iter()
             .map(|(key_id, verifying_key)| {
                 let public_key_multibase = match verifying_key.to_did() {
@@ -272,7 +270,8 @@ impl From<&Account> for DidDocument {
             })
             .collect();
 
-        let services: Vec<DidService> = account.services
+        let services: Vec<DidService> = account
+            .services
             .iter()
             .map(|(service_id, service)| DidService {
                 id: format!("#{}", service_id),

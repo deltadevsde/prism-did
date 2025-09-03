@@ -1,16 +1,25 @@
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
 
 use anyhow::{Result, bail, ensure};
+use base32::Alphabet;
+use ciborium::{cbor, into_writer, ser};
 use jmt::{
     KeyHash,
     storage::{TreeReader, TreeWriter},
 };
 use prism_errors::DatabaseError;
 use prism_serde::binary::{FromBinary, ToBinary};
+use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use prism_common::{
-    account::Account, digest::Digest, operation::Operation, transaction::Transaction,
+    account::{Account, Service},
+    digest::Digest,
+    operation::Operation,
+    transaction::Transaction,
 };
 
 use crate::{
@@ -31,6 +40,18 @@ pub trait SnarkableTree: Send + Sync {
     fn insert(&mut self, key: KeyHash, tx: Transaction) -> Result<InsertProof>;
     fn update(&mut self, key: KeyHash, tx: Transaction) -> Result<UpdateProof>;
     fn get(&self, key: KeyHash) -> Result<AccountResponse>;
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct UnsignedPLCOp {
+    #[serde(rename = "type")]
+    type_: String,
+    rotation_keys: Vec<String>,
+    also_known_as: Vec<String>,
+    verification_methods: HashMap<String, String>,
+    services: HashMap<String, Service>,
+    prev: Option<String>,
 }
 
 impl<S> SnarkableTree for KeyDirectoryTree<S>
@@ -101,16 +122,42 @@ where
                     )));
                 }
 
-                // TODO(DID): Ensure hash is built from real JSON struct
-                // let hash = Digest::hash_items(&[
-                //     &did,
-                //     &rotation_keys.(),
-                //     &also_known_as,
-                //     &verification_methods,
-                //     &atproto_pds,
-                // ]);
+                // TODO(DID): dangerous unwrap, not all key types are supported
+                let rotation_keys =
+                    rotation_keys.iter().map(|k| k.to_did().unwrap()).collect::<Vec<_>>();
 
-                // TODO(DID): Verify signature over JSON-LD
+                let verification_methods = verification_methods
+                    .iter()
+                    .map(|(n, k)| (n.clone(), k.to_did().unwrap()))
+                    .collect::<HashMap<String, String>>();
+
+                let val = UnsignedPLCOp {
+                    type_: "plc_operation".to_string(),
+                    rotation_keys,
+                    also_known_as: also_known_as.clone(),
+                    verification_methods,
+                    services: HashMap::from([("atproto_pds".to_string(), Service::new_pds(atproto_pds.clone()))]),
+                    prev: None,
+                };
+
+                let cbor_val = serde_ipld_dagcbor::to_vec(&val).unwrap();
+                let hash = Digest::hash(cbor_val);
+
+                let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hash.as_bytes());
+                let derived_did = format!("did:plc:{}", b32[0..24].to_string());
+                assert_eq!(did, &derived_did);
+
+
+                /*
+                 // fn to_did(&self) -> Result<String, PLCError> {
+                 //     let dag = serde_ipld_dagcbor::to_vec(&self).map_err(|e| PLCError::Other(e.into()))?;
+                 //     let hashed = Sha256::digest(dag.as_slice());
+                 //     let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hashed.as_slice());
+                 //     Ok(format!("did:plc:{}", b32[0..24].to_string()))
+                 // }
+                 */
+
+                // TODO(DID): Verify signature over CBOR
                 // transaction.vk.verify_signature(hash, &transaction.signature)?;
 
                 // TODO(DID): Ensure did is built from valid hash
@@ -243,3 +290,50 @@ where
         }
     }
 }
+
+// #[cfg(test)]
+// mod test {
+//     use std::collections::HashMap;
+
+//     use ciborium::cbor;
+//     use prism_common::account::Service;
+//     use prism_keys::{SigningKey, VerifyingKey};
+//     use serde::{Deserialize, Serialize};
+
+//     #[test]
+//     fn test_did_stuff() {
+//         let signer = SigningKey::new_secp256k1();
+//         let vk = signer.clone().verifying_key();
+
+//         let secondary_key = SigningKey::new_secp256r1();
+
+//         let rotation_keys: Vec<String> = Vec::new();
+//         let also_known_as = vec!["at://ryan.dev".to_string()];
+//         let verification_methods =
+//             HashMap::from([("at_proto".to_string(), vk.clone().to_did().unwrap())]);
+//         let pds = "https://pds.prism.rs/".to_string();
+
+//         let cbor_val = cbor!({
+//             "prev" => null,
+//             "type" => "plc_operation",
+//             "services" => { "atproto_pds" => {"type" => "AtprotoPersonalDataServer", "endpoint"
+// => pds}},             "alsoKnownAs" => also_known_as,
+//             "rotationKeys" => rotation_keys,
+//             "verificationMethods" => verification_methods,
+//         }).unwrap();
+//         let mut val = Vec::new();
+//         ciborium::into_writer(&cbor_val, &mut val).unwrap();
+
+//         let uso = UnsignedOp {
+//             type_: "plc_operation".to_string(),
+//             rotation_keys,
+//             also_known_as,
+//             verification_methods,
+//             services: HashMap::from([("atproto_pds".to_string(), Service::new_pds(pds))]),
+//             prev: None,
+//         };
+
+//         let ipld_cbor = serde_ipld_dagcbor::to_vec(&uso).unwrap();
+//         assert_eq!(ipld_cbor, val)
+//     }
+// }

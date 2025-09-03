@@ -60,7 +60,6 @@ impl From<anyhow::Error> for PrismApiError {
     }
 }
 
-// TODO(DID): Implement new op type
 #[async_trait]
 pub trait PrismApi
 where
@@ -121,7 +120,7 @@ where
         atproto_pds: String,
         signing_key: &SigningKey,
     ) -> Result<impl PendingTransaction<Timer = Self::Timer>, PrismApiError> {
-        //TODO(DID): assert signing_key in rotation_keys
+        assert!(rotation_keys.contains(&signing_key.clone().verifying_key()));
         self.build_request()
             .create_did()
             .with_also_known_as(also_known_as)

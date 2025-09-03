@@ -225,9 +225,9 @@ where
             atproto_pds: self.atproto_pds.clone(),
         };
 
+        // TODO(DID): This needs to use DAG-CBOR encoding
         let op_hash = Digest::hash(
             &operation
-                // TODO(DID): This actually needs to be encoded to hex or smth
                 .encode_to_bytes()
                 .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?,
         );

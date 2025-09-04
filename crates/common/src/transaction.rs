@@ -119,12 +119,21 @@ impl TryInto<Transaction> for DidTransaction {
             nonce,
             signature: Signature::from_algorithm_and_bytes(
                 prism_keys::CryptoAlgorithm::Secp256k1,
-                &Vec::from_base64(&signature).unwrap(),
+                &Vec::from_base64(&base64url_to_base64(&signature)).unwrap(),
             )
             .unwrap(),
             vk: VerifyingKey::from_did(&vk).unwrap(),
         })
     }
+}
+
+fn base64url_to_base64(input: &str) -> String {
+    let mut result = input.replace('-', "+").replace('_', "/");
+    // Add padding if needed
+    while result.len() % 4 != 0 {
+        result.push('=');
+    }
+    result
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]

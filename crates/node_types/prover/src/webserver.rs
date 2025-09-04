@@ -8,7 +8,7 @@ use prism_common::{
             AccountDidResponse, AccountRequest, AccountResponse, CommitmentResponse, DidDocument,
         },
     },
-    transaction::Transaction,
+    transaction::{DidTransaction, Transaction},
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
@@ -74,6 +74,7 @@ impl WebServer {
             .routes(routes!(get_account))
             .routes(routes!(get_did_document))
             .routes(routes!(post_transaction))
+            .routes(routes!(post_transaction2))
             .routes(routes!(get_commitment))
             .layer(CorsLayer::permissive())
             .with_state(self.session.clone())
@@ -126,6 +127,43 @@ async fn post_transaction(
     Json(transaction): Json<Transaction>,
 ) -> impl IntoResponse {
     match session.validate_and_queue_update(transaction).await {
+        Ok(_) => (
+            StatusCode::OK,
+            "Entry update queued for insertion into next epoch",
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            format!("Could not update entry: {}", e),
+        )
+            .into_response(),
+    }
+}
+
+/// Updates or inserts a transaction in the transparency dictionary, pending inclusion in the next
+/// epoch.
+#[utoipa::path(
+    post,
+    path = "/transaction_2",
+    request_body = DidTransaction,
+    responses(
+        (status = 200, description = "Entry update queued for insertion into next epoch"),
+        (status = 400, description = "Bad request"),
+        (status = 500, description = "Internal server error")
+    )
+)]
+async fn post_transaction2(
+    State(session): State<Arc<Prover>>,
+    Json(transaction): Json<DidTransaction>,
+) -> impl IntoResponse {
+    let transaction = transaction.try_into().map_err(|e| {
+        (
+            StatusCode::BAD_REQUEST,
+            format!("Failed to convert DidTransaction to Transaction: {}", e),
+        )
+            .into_response()
+    });
+    match session.validate_and_queue_update(transaction.unwrap()).await {
         Ok(_) => (
             StatusCode::OK,
             "Entry update queued for insertion into next epoch",

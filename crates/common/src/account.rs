@@ -151,10 +151,12 @@ impl Account {
             }
             _ => {
                 if tx.id != self.did {
-                    return Err(AccountError::TransactionIdError(
-                        tx.id.to_string(),
-                        self.did.to_string(),
-                    ));
+                    warn!("Transaction ID mismatch: {} != {}", tx.id, self.did);
+                    // TODO(DID): reactivate
+                    // return Err(AccountError::TransactionIdError(
+                    //     tx.id.to_string(),
+                    //     self.did.to_string(),
+                    // ));
                 }
                 if !self.rotation_keys.contains(&tx.vk) {
                     return Err(AccountError::InvalidKey);

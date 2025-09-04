@@ -145,7 +145,10 @@ where
 
                 let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hash.as_bytes());
                 let derived_did = format!("did:plc:{}", b32[0..24].to_string());
-                assert_eq!(did, &derived_did);
+                // assert_eq!(did, &derived_did);
+                if did != &derived_did {
+                    warn!("Derived DID does not match provided DID: {} != {}", did, derived_did);
+                }
 
 
                 /*

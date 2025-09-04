@@ -56,8 +56,8 @@ impl UnsignedTransaction {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateDIDOp {
+    did: String,
     verification_methods: HashMap<String, String>,
     rotation_keys: Vec<String>,
     also_known_as: Vec<String>,
@@ -107,7 +107,7 @@ impl TryInto<Transaction> for DidTransaction {
         Ok(Transaction {
             id: id.clone(),
             operation: Operation::CreateDID {
-                did: id,
+                did: operation.did,
                 verification_methods,
                 rotation_keys,
                 also_known_as: operation.also_known_as,

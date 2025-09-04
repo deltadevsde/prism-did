@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use celestia_types::Blob;
 use prism_errors::TransactionError;
 use prism_keys::{Signature, SigningKey, VerifyingKey, deserialize_from_did_str};
-use prism_serde::binary::{FromBinary, ToBinary};
+use prism_serde::{
+    base64::{self, FromBase64},
+    binary::{FromBinary, ToBinary},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -116,7 +119,7 @@ impl TryInto<Transaction> for DidTransaction {
             nonce,
             signature: Signature::from_algorithm_and_bytes(
                 prism_keys::CryptoAlgorithm::Secp256k1,
-                &signature.into_bytes(),
+                &Vec::from_base64(&signature).unwrap(),
             )
             .unwrap(),
             vk: VerifyingKey::from_did(&vk).unwrap(),

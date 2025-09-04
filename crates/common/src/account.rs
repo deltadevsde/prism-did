@@ -151,7 +151,7 @@ impl Account {
             }
             _ => {
                 if tx.id != self.did {
-                    warn!("Transaction ID mismatch: {} != {}", tx.id, self.did);
+                    println!("Transaction ID mismatch: {} != {}", tx.id, self.did);
                     // TODO(DID): reactivate
                     // return Err(AccountError::TransactionIdError(
                     //     tx.id.to_string(),

@@ -56,6 +56,7 @@ impl UnsignedTransaction {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateDIDOp {
     verification_methods: HashMap<String, String>,
     rotation_keys: Vec<String>,

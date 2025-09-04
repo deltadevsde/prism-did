@@ -68,7 +68,7 @@ pub struct CreateDIDOp {
 /// Represents a prism transaction that can be applied to an account.
 pub struct DidTransaction {
     /// The account id that this transaction is for
-    pub id: String,
+    pub did: String,
     /// The [`Operation`] to be applied to the account
     pub operation: CreateDIDOp,
     /// The nonce of the account at the time of this transaction
@@ -86,7 +86,7 @@ impl TryInto<Transaction> for DidTransaction {
 
     fn try_into(self) -> Result<Transaction, Self::Error> {
         let DidTransaction {
-            id,
+            did,
             operation,
             nonce,
             signature,
@@ -105,7 +105,7 @@ impl TryInto<Transaction> for DidTransaction {
             .collect();
 
         Ok(Transaction {
-            id: id.clone(),
+            id: did.clone(),
             operation: Operation::CreateDID {
                 did: operation.did,
                 verification_methods,

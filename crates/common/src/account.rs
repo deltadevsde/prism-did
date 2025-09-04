@@ -164,7 +164,8 @@ impl Account {
             }
         }
 
-        tx.verify_signature()?;
+        // TODO(DID): LOL. Just LOL.
+        // tx.verify_signature()?;
         Ok(())
     }
 

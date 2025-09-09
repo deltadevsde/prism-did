@@ -209,6 +209,7 @@ impl Account {
                 rotation_keys,
                 also_known_as,
                 atproto_pds,
+                ..
             } => {
                 self.did = did.clone();
                 self.also_known_as = also_known_as.clone();

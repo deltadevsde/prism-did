@@ -223,6 +223,8 @@ where
             rotation_keys: self.rotation_keys.clone(),
             also_known_as: self.also_known_as.clone(),
             atproto_pds: self.atproto_pds.clone(),
+            // TODO(DID): fix
+            signature: "".to_string(),
         };
 
         // TODO(DID): This needs to use DAG-CBOR encoding
@@ -242,6 +244,8 @@ where
             rotation_keys: self.rotation_keys,
             also_known_as: self.also_known_as,
             atproto_pds: self.atproto_pds,
+            // TODO(DID): fix
+            signature: "".to_string(),
         };
 
         operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;

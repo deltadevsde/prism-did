@@ -160,6 +160,8 @@ pub enum OperationError {
     EmptyServiceIdForAccount,
     #[error("data size {0} exceeds maximum allowed size")]
     DataTooLarge(usize),
+    #[error("operation not convertible to plc_operation")]
+    InvalidPLCConversion,
 }
 
 #[derive(Error, Clone, Debug)]

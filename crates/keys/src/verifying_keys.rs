@@ -3,6 +3,7 @@ use crate::{
     errors::{ParseError, SignatureError, VerificationError},
 };
 use alloy_primitives::eip191_hash_message;
+use bs58::Alphabet;
 use ed25519::PublicKeyBytes as Ed25519PublicKeyBytes;
 use ed25519_consensus::VerificationKey as Ed25519VerifyingKey;
 use k256::ecdsa::VerifyingKey as Secp256k1VerifyingKey;
@@ -36,37 +37,6 @@ use crate::{
     payload::CryptoPayload,
 };
 use prism_serde::base64::{FromBase64, ToBase64};
-
-/*
-* #[serde(deserialize_with = "path")]
-Deserialize this field using a function that is different from its implementation of Deserialize. The given function must be callable as fn<'de, D>(D) -> Result<T, D::Error> where D: Deserializer<'de>, although it may also be generic over T. Fields used with deserialize_with are not required to implement Deserialize.
-*/
-
-pub fn deserialize_from_did_str<'de, D>(
-    deserializer: D,
-) -> std::result::Result<VerifyingKey, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct DIDStringVisitor;
-
-    impl<'de> de::Visitor<'de> for DIDStringVisitor {
-        type Value = VerifyingKey;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a string containing json data")
-        }
-
-        fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            VerifyingKey::from_did(v).map_err(|e| E::custom(e))
-        }
-    }
-
-    deserializer.deserialize_any(DIDStringVisitor)
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(try_from = "CryptoPayload", into = "CryptoPayload")]
@@ -221,7 +191,6 @@ impl VerifyingKey {
         }
     }
 
-    // TODO(DID): DIDKey can be own type, this should be a From impl
     /// Converts the verifying key to a DID string, only supports Ed25519 and P256.
     pub fn to_did(&self) -> Result<String> {
         let prefix = String::from("did:key:");
@@ -229,17 +198,26 @@ impl VerifyingKey {
             VerifyingKey::Ed25519(vk) => {
                 let codec: &[u8] = &[0xed, 0x1];
                 let data = [codec, vk.as_bytes()].concat();
-                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+                Ok(format!(
+                    "{prefix}z{}",
+                    bs58::encode(data).with_alphabet(Alphabet::BITCOIN).into_string()
+                ))
             }
             VerifyingKey::Secp256r1(vk) => {
                 let codec: &[u8] = &[0x80, 0x24];
                 let data = [codec, vk.to_encoded_point(true).as_ref()].concat();
-                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+                Ok(format!(
+                    "{prefix}z{}",
+                    bs58::encode(data).with_alphabet(Alphabet::BITCOIN).into_string()
+                ))
             }
             VerifyingKey::Secp256k1(vk) => {
                 let codec: &[u8] = &[0xe7, 0x1];
                 let data = [codec, vk.to_encoded_point(true).as_ref()].concat();
-                Ok(format!("{prefix}z{}", bs58::encode(data).into_string()))
+                Ok(format!(
+                    "{prefix}z{}",
+                    bs58::encode(data).with_alphabet(Alphabet::BITCOIN).into_string()
+                ))
             }
             _ => Err(CryptoError::VerificationError(
                 VerificationError::NotImplementedError(

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use celestia_types::Blob;
 use prism_errors::TransactionError;
-use prism_keys::{Signature, SigningKey, VerifyingKey, deserialize_from_did_str};
+use prism_keys::{Signature, SigningKey, VerifyingKey};
 use prism_serde::{
-    base64::{self, FromBase64},
+    base64::FromBase64,
     binary::{FromBinary, ToBinary},
 };
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,7 @@ pub struct CreateDIDOp {
     rotation_keys: Vec<String>,
     also_known_as: Vec<String>,
     atproto_pds: String,
+    signature: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
@@ -115,6 +116,7 @@ impl TryInto<Transaction> for DidTransaction {
                 rotation_keys,
                 also_known_as: operation.also_known_as,
                 atproto_pds: operation.atproto_pds,
+                signature: operation.signature,
             },
             nonce,
             signature: Signature::from_algorithm_and_bytes(

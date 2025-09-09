@@ -18,8 +18,8 @@ use tracing::{debug, warn};
 use prism_common::{
     account::{Account, Service},
     digest::Digest,
-    operation::Operation,
-    transaction::Transaction,
+    operation::{self, Operation, SignedPLCOp, UnsignedPLCOp},
+    transaction::{CreateDIDOp, Transaction},
 };
 
 use crate::{
@@ -40,18 +40,6 @@ pub trait SnarkableTree: Send + Sync {
     fn insert(&mut self, key: KeyHash, tx: Transaction) -> Result<InsertProof>;
     fn update(&mut self, key: KeyHash, tx: Transaction) -> Result<UpdateProof>;
     fn get(&self, key: KeyHash) -> Result<AccountResponse>;
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct UnsignedPLCOp {
-    #[serde(rename = "type")]
-    type_: String,
-    rotation_keys: Vec<String>,
-    also_known_as: Vec<String>,
-    verification_methods: HashMap<String, String>,
-    services: HashMap<String, Service>,
-    prev: Option<String>,
 }
 
 impl<S> SnarkableTree for KeyDirectoryTree<S>
@@ -94,13 +82,8 @@ where
 
                 Ok(Proof::Update(Box::new(proof)))
             }
-            Operation::CreateDID {
-                did,
-                rotation_keys,
-                also_known_as,
-                verification_methods,
-                atproto_pds,
-                ..
+            op @ Operation::CreateDID {
+                did, rotation_keys, ..
             } => {
                 ensure!(
                     transaction.id == did.as_str(),
@@ -122,48 +105,15 @@ where
                     )));
                 }
 
-                // TODO(DID): dangerous unwrap, not all key types are supported
-                let rotation_keys =
-                    rotation_keys.iter().map(|k| k.to_did().unwrap()).collect::<Vec<_>>();
+                let unsigned_op = SignedPLCOp::try_from(op)?;
+                let derived_did = unsigned_op.derive_did();
 
-                let verification_methods = verification_methods
-                    .iter()
-                    .map(|(n, k)| (n.clone(), k.to_did().unwrap()))
-                    .collect::<HashMap<String, String>>();
-
-                let val = UnsignedPLCOp {
-                    type_: "plc_operation".to_string(),
-                    rotation_keys,
-                    also_known_as: also_known_as.clone(),
-                    verification_methods,
-                    services: HashMap::from([("atproto_pds".to_string(), Service::new_pds(atproto_pds.clone()))]),
-                    prev: None,
-                };
-
-                let cbor_val = serde_ipld_dagcbor::to_vec(&val).unwrap();
-                let hash = Digest::hash(cbor_val);
-
-                let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hash.as_bytes());
-                let derived_did = format!("did:plc:{}", b32[0..24].to_string());
-                // assert_eq!(did, &derived_did);
-                if did != &derived_did {
-                    warn!("Derived DID does not match provided DID: {} != {}", did, derived_did);
-                }
-
-
-                /*
-                 // fn to_did(&self) -> Result<String, PLCError> {
-                 //     let dag = serde_ipld_dagcbor::to_vec(&self).map_err(|e| PLCError::Other(e.into()))?;
-                 //     let hashed = Sha256::digest(dag.as_slice());
-                 //     let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hashed.as_slice());
-                 //     Ok(format!("did:plc:{}", b32[0..24].to_string()))
-                 // }
-                 */
+                // TODO(did): error instead of assert which panics
+                assert_eq!(did, &derived_did);
 
                 // TODO(DID): Verify signature over CBOR
                 // transaction.vk.verify_signature(hash, &transaction.signature)?;
 
-                // TODO(DID): Ensure did is built from valid hash
                 debug!("creating new DID for user ID {}", did);
 
                 let insert_proof = self.insert(account_key_hash, transaction)?;

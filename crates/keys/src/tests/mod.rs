@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod key_tests {
     use crate::errors::{CryptoError, VerificationError};
+    use base64::{Engine as _, alphabet, engine::general_purpose};
     use ed25519_consensus::SigningKey as Ed25519SigningKey;
     use prism_serde::base64::{FromBase64, ToBase64};
     use rand::rngs::OsRng;
@@ -8,6 +9,19 @@ mod key_tests {
     use tempfile::tempdir;
 
     use crate::{CryptoAlgorithm, Signature, SigningKey, VerifyingKey};
+
+    #[test]
+    fn reparsed_plc_signature() {
+        let signature = "F0_AgX0tghOjtCMPsMGxHP-8JL11GiR8ikgf68XofQAa1vgEZvEe9VBWFko8isAjT5pkcZOf0GBPAq1cujBNHw".to_string();
+        let sig_bytes =
+            general_purpose::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD)
+                .decode(&signature)
+                .unwrap();
+        let parsed_signature =
+            Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &sig_bytes).unwrap();
+        let reparsed_signature = parsed_signature.to_plc_signature().unwrap();
+        assert_eq!(signature, reparsed_signature);
+    }
 
     #[test]
     fn test_reparsed_verifying_keys_are_equal_to_original() {

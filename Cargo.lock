@@ -7150,6 +7150,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base32",
+ "base64 0.22.1",
  "bs58 0.4.0",
  "celestia-types",
  "mockall",
@@ -7217,6 +7218,7 @@ name = "prism-keys"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
+ "base64 0.22.1",
  "bs58 0.4.0",
  "ciborium",
  "ed25519",

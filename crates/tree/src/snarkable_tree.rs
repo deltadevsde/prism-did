@@ -111,8 +111,7 @@ where
                 // TODO(did): error instead of assert which panics
                 assert_eq!(did, &derived_did);
 
-                // TODO(DID): Verify signature over CBOR
-                // transaction.vk.verify_signature(hash, &transaction.signature)?;
+                transaction.verify_cbor_signature()?;
 
                 debug!("creating new DID for user ID {}", did);
 
@@ -243,50 +242,3 @@ where
         }
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use std::collections::HashMap;
-
-//     use ciborium::cbor;
-//     use prism_common::account::Service;
-//     use prism_keys::{SigningKey, VerifyingKey};
-//     use serde::{Deserialize, Serialize};
-
-//     #[test]
-//     fn test_did_stuff() {
-//         let signer = SigningKey::new_secp256k1();
-//         let vk = signer.clone().verifying_key();
-
-//         let secondary_key = SigningKey::new_secp256r1();
-
-//         let rotation_keys: Vec<String> = Vec::new();
-//         let also_known_as = vec!["at://ryan.dev".to_string()];
-//         let verification_methods =
-//             HashMap::from([("at_proto".to_string(), vk.clone().to_did().unwrap())]);
-//         let pds = "https://pds.prism.rs/".to_string();
-
-//         let cbor_val = cbor!({
-//             "prev" => null,
-//             "type" => "plc_operation",
-//             "services" => { "atproto_pds" => {"type" => "AtprotoPersonalDataServer", "endpoint"
-// => pds}},             "alsoKnownAs" => also_known_as,
-//             "rotationKeys" => rotation_keys,
-//             "verificationMethods" => verification_methods,
-//         }).unwrap();
-//         let mut val = Vec::new();
-//         ciborium::into_writer(&cbor_val, &mut val).unwrap();
-
-//         let uso = UnsignedOp {
-//             type_: "plc_operation".to_string(),
-//             rotation_keys,
-//             also_known_as,
-//             verification_methods,
-//             services: HashMap::from([("atproto_pds".to_string(), Service::new_pds(pds))]),
-//             prev: None,
-//         };
-
-//         let ipld_cbor = serde_ipld_dagcbor::to_vec(&uso).unwrap();
-//         assert_eq!(ipld_cbor, val)
-//     }
-// }

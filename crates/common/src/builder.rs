@@ -217,48 +217,49 @@ where
 
     // TODO(DID): atrocious, hacky rust
     pub fn build(self) -> Result<SigningTransactionRequestBuilder<'a, P>, TransactionError> {
-        let operation = Operation::CreateDID {
-            did: "".to_string(),
-            verification_methods: self.verification_methods.clone(),
-            rotation_keys: self.rotation_keys.clone(),
-            also_known_as: self.also_known_as.clone(),
-            atproto_pds: self.atproto_pds.clone(),
-            // TODO(DID): fix
-            signature: "".to_string(),
-        };
+        unimplemented!("TODO(DID)")
+        // let operation = Operation::CreateDID {
+        //     did: "".to_string(),
+        //     verification_methods: self.verification_methods.clone(),
+        //     rotation_keys: self.rotation_keys.clone(),
+        //     also_known_as: self.also_known_as.clone(),
+        //     atproto_pds: self.atproto_pds.clone(),
+        //     // TODO(DID): fix
+        //     signature: "".to_string(),
+        // };
 
-        // TODO(DID): This needs to use DAG-CBOR encoding
-        let op_hash = Digest::hash(
-            &operation
-                .encode_to_bytes()
-                .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?,
-        );
+        // // TODO(DID): This needs to use DAG-CBOR encoding
+        // let op_hash = Digest::hash(
+        //     &operation
+        //         .encode_to_bytes()
+        //         .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?,
+        // );
 
-        let mut b32 = encode_base32(op_hash.as_bytes());
-        b32.split_off(24);
-        let did = format!("did:prism:{}", b32);
+        // let mut b32 = encode_base32(op_hash.as_bytes());
+        // b32.split_off(24);
+        // let did = format!("did:prism:{}", b32);
 
-        let operation = Operation::CreateDID {
-            did: did.clone(),
-            verification_methods: self.verification_methods,
-            rotation_keys: self.rotation_keys,
-            also_known_as: self.also_known_as,
-            atproto_pds: self.atproto_pds,
-            // TODO(DID): fix
-            signature: "".to_string(),
-        };
+        // let operation = Operation::CreateDID {
+        //     did: did.clone(),
+        //     verification_methods: self.verification_methods,
+        //     rotation_keys: self.rotation_keys,
+        //     also_known_as: self.also_known_as,
+        //     atproto_pds: self.atproto_pds,
+        //     // TODO(DID): fix
+        //     signature: "".to_string(),
+        // };
 
-        operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
+        // operation.validate_basic().map_err(|e| TransactionError::InvalidOp(e.to_string()))?;
 
-        let unsigned_transaction = UnsignedTransaction {
-            id: self.did,
-            operation,
-            nonce: 0,
-        };
-        Ok(SigningTransactionRequestBuilder::new(
-            self.prism,
-            unsigned_transaction,
-        ))
+        // let unsigned_transaction = UnsignedTransaction {
+        //     id: self.did,
+        //     operation,
+        //     nonce: 0,
+        // };
+        // Ok(SigningTransactionRequestBuilder::new(
+        //     self.prism,
+        //     unsigned_transaction,
+        // ))
     }
 }
 

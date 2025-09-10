@@ -1,4 +1,5 @@
 use crate::{CryptoError, Result, errors::SignatureError};
+use base64::{Engine, engine::general_purpose};
 use ed25519_consensus::Signature as Ed25519Signature;
 use k256::ecdsa::Signature as Secp256k1Signature;
 use p256::ecdsa::Signature as Secp256r1Signature;
@@ -37,6 +38,13 @@ impl Signature {
             Signature::Secp256k1(sig) => sig.to_vec(),
             Signature::Secp256r1(sig) => sig.to_vec(),
         }
+    }
+
+    pub fn to_plc_signature(&self) -> Result<String> {
+        let sig_bytes = self.to_bytes();
+        let result = general_purpose::URL_SAFE_NO_PAD.encode(sig_bytes);
+
+        Ok(result)
     }
 
     pub fn from_algorithm_and_bytes(algorithm: CryptoAlgorithm, bytes: &[u8]) -> Result<Self> {

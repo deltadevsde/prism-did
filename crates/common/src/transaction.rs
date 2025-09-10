@@ -1,12 +1,10 @@
 use std::collections::HashMap;
 
+use base64::{Engine as _, alphabet, engine::general_purpose};
 use celestia_types::Blob;
 use prism_errors::TransactionError;
 use prism_keys::{Signature, SigningKey, VerifyingKey};
-use prism_serde::{
-    base64::FromBase64,
-    binary::{FromBinary, ToBinary},
-};
+use prism_serde::binary::{FromBinary, ToBinary};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -59,13 +57,14 @@ impl UnsignedTransaction {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
+// TODO(DID): merge w SignedPLCOp
 pub struct CreateDIDOp {
-    did: String,
-    verification_methods: HashMap<String, String>,
-    rotation_keys: Vec<String>,
-    also_known_as: Vec<String>,
-    atproto_pds: String,
-    signature: String,
+    pub did: String,
+    pub verification_methods: HashMap<String, String>,
+    pub rotation_keys: Vec<String>,
+    pub also_known_as: Vec<String>,
+    pub atproto_pds: String,
+    pub signature: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
@@ -81,8 +80,73 @@ pub struct DidTransaction {
     pub signature: String,
     /// The verifying key of the signer of this transaction. This vk must be
     /// included in the account's valid_keys set.
-    // #[serde(deserialize_with = "deserialize_from_did_str")]
     pub vk: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
+/// Represents a prism transaction that can be applied to an account.
+pub struct USDidTransaction {
+    /// The account id that this transaction is for
+    pub did: String,
+    /// The [`Operation`] to be applied to the account
+    pub operation: CreateDIDOp,
+    /// The nonce of the account at the time of this transaction
+    pub nonce: u64,
+}
+
+impl Into<USDidTransaction> for DidTransaction {
+    fn into(self) -> USDidTransaction {
+        USDidTransaction {
+            did: self.did,
+            operation: self.operation,
+            nonce: self.nonce,
+        }
+    }
+}
+
+impl TryInto<DidTransaction> for Transaction {
+    type Error = std::io::Error;
+
+    fn try_into(self) -> Result<DidTransaction, Self::Error> {
+        match self.operation {
+            Operation::CreateDID {
+                did,
+                verification_methods,
+                rotation_keys,
+                also_known_as,
+                atproto_pds,
+                signature,
+            } => {
+                let verification_methods: HashMap<String, String> = verification_methods
+                    .into_iter()
+                    .map(|(a, b)| (a, b.to_did().unwrap()))
+                    .collect();
+                let rotation_keys: Vec<String> =
+                    rotation_keys.into_iter().map(|a| a.to_did().unwrap()).collect();
+
+                let plc_sig = signature.to_plc_signature().unwrap();
+                let operation = CreateDIDOp {
+                    did: did.clone(),
+                    verification_methods,
+                    rotation_keys,
+                    also_known_as,
+                    atproto_pds,
+                    signature: plc_sig.clone(),
+                };
+                Ok(DidTransaction {
+                    did,
+                    operation,
+                    nonce: self.nonce,
+                    signature: plc_sig.clone(),
+                    vk: self.vk.to_did().unwrap(),
+                })
+            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid operation",
+            )),
+        }
+    }
 }
 
 impl TryInto<Transaction> for DidTransaction {
@@ -116,26 +180,28 @@ impl TryInto<Transaction> for DidTransaction {
                 rotation_keys,
                 also_known_as: operation.also_known_as,
                 atproto_pds: operation.atproto_pds,
-                signature: operation.signature,
+                signature: Signature::from_algorithm_and_bytes(
+                    prism_keys::CryptoAlgorithm::Secp256k1,
+                    &general_purpose::GeneralPurpose::new(
+                        &alphabet::URL_SAFE,
+                        general_purpose::NO_PAD,
+                    )
+                    .decode(&operation.signature)
+                    .unwrap(),
+                )
+                .unwrap(),
             },
             nonce,
             signature: Signature::from_algorithm_and_bytes(
                 prism_keys::CryptoAlgorithm::Secp256k1,
-                &Vec::from_base64(&base64url_to_base64(&signature)).unwrap(),
+                &general_purpose::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD)
+                    .decode(&signature)
+                    .unwrap(),
             )
             .unwrap(),
             vk: VerifyingKey::from_did(&vk).unwrap(),
         })
     }
-}
-
-fn base64url_to_base64(input: &str) -> String {
-    let mut result = input.replace('-', "+").replace('_', "/");
-    // Add padding if needed
-    while result.len() % 4 != 0 {
-        result.push('=');
-    }
-    result
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
@@ -161,6 +227,19 @@ impl Transaction {
         let message = self
             .to_unsigned_tx()
             .encode_to_bytes()
+            .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?;
+
+        self.vk
+            .verify_signature(&message, &self.signature)
+            .map_err(|e| TransactionError::InvalidOp(e.to_string()))
+    }
+
+    // Used for verifying CBOR-encoded transactions (for DID operations)
+    pub fn verify_cbor_signature(&self) -> Result<(), TransactionError> {
+        let did_tx: DidTransaction = self.clone().try_into().unwrap();
+        let us_did_tx: USDidTransaction = did_tx.into();
+
+        let message = serde_ipld_dagcbor::to_vec(&us_did_tx)
             .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?;
 
         self.vk

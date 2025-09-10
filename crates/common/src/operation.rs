@@ -3,10 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::{self, collections::HashMap, fmt::Display};
 use utoipa::ToSchema;
 
-use crate::{account::Service, digest::Digest};
-use prism_keys::{Signature, VerifyingKey};
+use crate::{account::Service, digest::Digest, transaction};
+use prism_keys::{CryptoAlgorithm, Signature, VerifyingKey};
+use prism_serde::base64::FromBase64;
 
-use prism_errors::OperationError;
+use prism_errors::{OperationError, TransactionError};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[schema(
@@ -34,7 +35,7 @@ pub enum Operation {
         atproto_pds: String,
         // NOTE: This signature is not a prism signature, so is held in a string.
         // TODO(did): Do validation anyways
-        signature: String,
+        signature: Signature,
     },
     #[schema(title = "AddKey")]
     /// Adds a key to an existing account.
@@ -160,7 +161,7 @@ impl TryFrom<&Operation> for SignedPLCOp {
 
                 Ok(SignedPLCOp {
                     unsigned: plc_op,
-                    sig: signature.clone(),
+                    sig: signature.to_plc_signature().unwrap(),
                 })
             }
             _ => Err(OperationError::InvalidPLCConversion),
@@ -178,6 +179,36 @@ impl SignedPLCOp {
 
         derived_did
     }
+
+    // Not needed because done on Transaction level before being converted into SignedPLCOp
+    // Takes vk to avoid re-conversion from string to VerifyingKey in circuit.
+    // pub fn verify_signature(&self, vk: VerifyingKey) -> Result<(), TransactionError> {
+    //     let cbor_val = serde_ipld_dagcbor::to_vec(&self).unwrap();
+    //     let hash = Digest::hash(cbor_val.as_slice());
+
+    //     match &vk {
+    //         VerifyingKey::Secp256r1(key) => {
+    //             let sig_bytes =
+    //                 &Vec::from_base64(transaction::base64url_to_base64(&self.sig)).unwrap();
+    //             let signature =
+    //                 Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256r1, sig_bytes)
+    //                     .unwrap();
+
+    //             vk.verify_signature(message, signature)
+    //             signature.verify(hash, key)
+    //         }
+    //         VerifyingKey::Secp256k1(key) => {
+    //             let signature =
+    //                 Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &self.sig)?;
+    //             signature.verify(hash, key)
+    //         }
+    //         _ => Err(TransactionError::EncodingFailed(
+    //             "Signature type not supported for PLC operations".to_string(),
+    //         )),
+    //     }
+
+    //     vk.verify_signature(hash, &self.sig)
+    // }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]

@@ -136,6 +136,10 @@ impl Account {
 
         match &tx.operation {
             Operation::CreateAccount { id, key, .. } => {
+                if !self.is_empty() {
+                    return Err(AccountError::NonceError(tx.nonce, self.nonce));
+                }
+
                 if &tx.id != id {
                     return Err(AccountError::AccountIdError(
                         tx.id.to_string(),
@@ -148,24 +152,27 @@ impl Account {
                         key.to_string(),
                     ));
                 }
+
+                tx.verify_signature()?;
+            }
+            Operation::CreateDID { did, .. } => {
+                if !self.is_empty() {
+                    return Err(AccountError::NonceError(tx.nonce, self.nonce));
+                }
+
+                if &tx.id != did {
+                    return Err(AccountError::AccountIdError(
+                        tx.id.to_string(),
+                        did.to_string(),
+                    ));
+                }
+                tx.verify_cbor_signature()?;
             }
             _ => {
-                // if tx.id != self.did {
-                // println!("Transaction ID mismatch: {} != {}", tx.id, self.did);
-                // TODO(DID): reactivate
-                // return Err(AccountError::TransactionIdError(
-                //     tx.id.to_string(),
-                //     self.did.to_string(),
-                // ));
-                // }
-                // if !self.rotation_keys.contains(&tx.vk) {
-                //     return Err(AccountError::InvalidKey);
-                // }
+                tx.verify_signature()?;
             }
         }
 
-        // TODO(DID): LOL. Just LOL.
-        // tx.verify_signature()?;
         Ok(())
     }
 

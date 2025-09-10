@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use prism_errors::TransactionError;
 use prism_keys::{SigningKey, VerifyingKey};
-use prism_serde::binary::ToBinary;
 
 use crate::{
     account::Account,

@@ -5,17 +5,8 @@ extern crate log;
 
 use anyhow::Result;
 // use prism_common::test_transaction_builder::TestTransactionBuilder;
-use prism_da::{
-    DataAvailabilityLayer, FullNodeDAConfig, LightClientDAConfig,
-    celestia::{
-        CelestiaFullNodeDAConfig, CelestiaLightClientDAConfig, CelestiaLightClientDAStoreConfig,
-        CelestiaNetwork, DEFAULT_PRUNING_WINDOW_IN_MEMORY,
-    },
-    create_full_node_da_layer, create_light_client_da_layer,
-    memory::InMemoryDataAvailabilityLayer,
-};
-use prism_keys::{CryptoAlgorithm, SigningKey, VerifyingKey};
-use prism_lightclient::LightClient;
+use prism_da::{DataAvailabilityLayer, FullNodeDAConfig, memory::InMemoryDataAvailabilityLayer};
+use prism_keys::{CryptoAlgorithm, SigningKey};
 use prism_prover::{
     Prover, ProverEngineOptions, ProverOptions, SequencerOptions, SyncerOptions, WebServerConfig,
 };
@@ -25,8 +16,7 @@ use prism_storage::{
 };
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::sync::Arc;
-use tokio::{spawn, sync::mpsc, time::Duration};
-use tokio_util::sync::CancellationToken;
+use tokio::{spawn, time::Duration};
 
 use tempfile::TempDir;
 
@@ -58,7 +48,7 @@ async fn test_light_client_prover_talking() -> Result<()> {
     let da = Arc::new(da);
     da.start().await?;
 
-    let bridge_cfg = FullNodeDAConfig::InMemory;
+    // let bridge_cfg = FullNodeDAConfig::InMemory;
 
     // VerifyingKey::try_from("did:key:zQ3shkuYr2wT19g3jMGfrZLVMVq9FpzvNyUc2zEWkKpg5eYjz".
     // to_string())     .expect("couldn't decode vk");
@@ -73,9 +63,9 @@ async fn test_light_client_prover_talking() -> Result<()> {
     //     store: CelestiaLightClientDAStoreConfig::InMemory,
     //     ..CelestiaLightClientDAConfig::default()
     // });
-    let mut rng = StdRng::from_entropy();
+    // let mut rng = StdRng::from_entropy();
     let prover_algorithm = CryptoAlgorithm::Ed25519;
-    let service_algorithm = random_algorithm(&mut rng);
+    // let service_algorithm = random_algorithm(&mut rng);
 
     // let bridge_da_layer = create_full_node_da_layer(&bridge_cfg).await.unwrap();
     // let lc_da_layer = create_light_client_da_layer(&lc_cfg).await.unwrap();
@@ -212,7 +202,7 @@ async fn test_light_client_prover_talking() -> Result<()> {
         let mut rx = da.clone().subscribe_to_heights();
         let initial_height = rx.recv().await.unwrap();
         debug!("Initial height: {}", initial_height);
-        let target_height = initial_height + 500;
+        let target_height = initial_height + 500000000;
 
         while let Ok(height) = rx.recv().await {
             debug!("Received height {}", height);
@@ -237,10 +227,10 @@ async fn test_light_client_prover_talking() -> Result<()> {
     Ok(())
 }
 
-fn random_algorithm(rng: &mut StdRng) -> CryptoAlgorithm {
-    [
-        CryptoAlgorithm::Ed25519,
-        CryptoAlgorithm::Secp256k1,
-        CryptoAlgorithm::Secp256r1,
-    ][rng.gen_range(0..3)]
-}
+// fn random_algorithm(rng: &mut StdRng) -> CryptoAlgorithm {
+//     [
+//         CryptoAlgorithm::Ed25519,
+//         CryptoAlgorithm::Secp256k1,
+//         CryptoAlgorithm::Secp256r1,
+//     ][rng.gen_range(0..3)]
+// }

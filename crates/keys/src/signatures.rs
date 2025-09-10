@@ -47,6 +47,12 @@ impl Signature {
         Ok(result)
     }
 
+    // TODO(DID): other blessed curve
+    pub fn from_plc_signature(s: &str) -> Result<Self> {
+        let bytes = general_purpose::URL_SAFE_NO_PAD.decode(s).unwrap();
+        Self::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &bytes)
+    }
+
     pub fn from_algorithm_and_bytes(algorithm: CryptoAlgorithm, bytes: &[u8]) -> Result<Self> {
         match algorithm {
             CryptoAlgorithm::Ed25519 => Ed25519Signature::try_from(bytes)

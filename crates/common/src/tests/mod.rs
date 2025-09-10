@@ -3,15 +3,45 @@
 use std::collections::HashMap;
 
 use base64::{Engine as _, alphabet, engine::general_purpose};
-use prism_keys::errors::{CryptoError, VerificationError};
 
-use prism_keys::{CryptoAlgorithm, Signature, SigningKey, VerifyingKey};
+use prism_keys::{CryptoAlgorithm, Signature};
 
 use crate::{
     account::Service,
     operation::{SignedPLCOp, UnsignedPLCOp},
-    transaction::{CreateDIDOp, DidTransaction, Transaction},
+    transaction::{DidTransaction, Transaction},
 };
+
+#[test]
+fn test_did_creation() {
+    let plc_op = UnsignedPLCOp {
+        type_: "plc_operation".to_string(),
+        services: HashMap::from([(
+            "atproto_pds".to_string(),
+            Service::new_pds("http://localhost:65473".to_string()),
+        )]),
+        verification_methods: HashMap::from([(
+            "atproto".to_string(),
+            "did:key:zQ3shRqHqyhXgCjBmLyPhwN6ENSLMYCVUS7684MKrmVunRF8H".to_string(),
+        )]),
+        rotation_keys: vec![
+            "did:key:zQ3shYUkjUJWLxshqnPbDb1bwc2wMeRy65yQ7TdeotDRoA54G".to_string(),
+            "did:key:zQ3shZUHZuc3Z74mmMhZG2FS87oLqdiHBJyrv5vSc4tychPZF".to_string(),
+        ],
+        also_known_as: vec!["at://mod-authority.test".to_string()],
+        prev: None,
+    };
+
+    let signed = SignedPLCOp {
+        unsigned: plc_op,
+        sig:
+            "F0_AgX0tghOjtCMPsMGxHP-8JL11GiR8ikgf68XofQAa1vgEZvEe9VBWFko8isAjT5pkcZOf0GBPAq1cujBNHw"
+                .to_string(),
+    };
+    let did = signed.derive_did();
+
+    assert_eq!(did, "did:prism:3l3bnfketdgiqyfxjju4pfda".to_string());
+}
 
 #[test]
 fn plc_signature_verification() {
@@ -59,13 +89,14 @@ fn plc_signature_verification() {
 
     let tx: Transaction = DidTransaction {
         did: did.clone(),
-        operation: CreateDIDOp {
-            did,
-            verification_methods: plc_op.verification_methods.clone(),
-            rotation_keys: plc_op.rotation_keys.clone(),
-            also_known_as: plc_op.also_known_as.clone(),
-            atproto_pds: "http://localhost:61369".to_string(),
-            signature: signed.sig.clone(),
+        operation: SignedPLCOp {
+            unsigned: UnsignedPLCOp::new_genesis(
+                plc_op.rotation_keys.clone(),
+                plc_op.verification_methods.clone(),
+                plc_op.also_known_as.clone(),
+                "http://localhost:61369".to_string(),
+            ),
+            sig: signed.sig.clone(),
         },
         nonce: 0,
         signature: reparsed_signature,

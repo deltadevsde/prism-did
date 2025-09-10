@@ -8,7 +8,7 @@ use prism_serde::binary::{FromBinary, ToBinary};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::operation::{Operation, SignatureBundle};
+use crate::operation::{Operation, SignatureBundle, SignedPLCOp, UnsignedPLCOp};
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 /// Represents a partial prism transaction that still needs to be signed.
@@ -57,23 +57,12 @@ impl UnsignedTransaction {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
-// TODO(DID): merge w SignedPLCOp
-pub struct CreateDIDOp {
-    pub did: String,
-    pub verification_methods: HashMap<String, String>,
-    pub rotation_keys: Vec<String>,
-    pub also_known_as: Vec<String>,
-    pub atproto_pds: String,
-    pub signature: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 /// Represents a prism transaction that can be applied to an account.
 pub struct DidTransaction {
     /// The account id that this transaction is for
     pub did: String,
     /// The [`Operation`] to be applied to the account
-    pub operation: CreateDIDOp,
+    pub operation: SignedPLCOp,
     /// The nonce of the account at the time of this transaction
     pub nonce: u64,
     /// The signature of the transaction, signed by [`self::vk`].
@@ -89,17 +78,17 @@ pub struct USDidTransaction {
     /// The account id that this transaction is for
     pub did: String,
     /// The [`Operation`] to be applied to the account
-    pub operation: CreateDIDOp,
+    pub operation: SignedPLCOp,
     /// The nonce of the account at the time of this transaction
     pub nonce: u64,
 }
 
-impl Into<USDidTransaction> for DidTransaction {
-    fn into(self) -> USDidTransaction {
+impl From<DidTransaction> for USDidTransaction {
+    fn from(tx: DidTransaction) -> Self {
         USDidTransaction {
-            did: self.did,
-            operation: self.operation,
-            nonce: self.nonce,
+            did: tx.did,
+            operation: tx.operation,
+            nonce: tx.nonce,
         }
     }
 }
@@ -125,13 +114,14 @@ impl TryInto<DidTransaction> for Transaction {
                     rotation_keys.into_iter().map(|a| a.to_did().unwrap()).collect();
 
                 let plc_sig = signature.to_plc_signature().unwrap();
-                let operation = CreateDIDOp {
-                    did: did.clone(),
-                    verification_methods,
-                    rotation_keys,
-                    also_known_as,
-                    atproto_pds,
-                    signature: plc_sig.clone(),
+                let operation = SignedPLCOp {
+                    unsigned: UnsignedPLCOp::new_genesis(
+                        rotation_keys,
+                        verification_methods,
+                        also_known_as,
+                        atproto_pds,
+                    ),
+                    sig: plc_sig.clone(),
                 };
                 Ok(DidTransaction {
                     did,
@@ -162,11 +152,13 @@ impl TryInto<Transaction> for DidTransaction {
         } = self;
 
         let verification_methods: HashMap<String, VerifyingKey> = operation
+            .unsigned
             .verification_methods
             .into_iter()
             .map(|(a, b)| (a, VerifyingKey::from_did(&b).unwrap()))
             .collect();
         let rotation_keys: Vec<VerifyingKey> = operation
+            .unsigned
             .rotation_keys
             .into_iter()
             .map(|a| VerifyingKey::from_did(&a).unwrap())
@@ -175,18 +167,24 @@ impl TryInto<Transaction> for DidTransaction {
         Ok(Transaction {
             id: did.clone(),
             operation: Operation::CreateDID {
-                did: operation.did,
+                did,
                 verification_methods,
                 rotation_keys,
-                also_known_as: operation.also_known_as,
-                atproto_pds: operation.atproto_pds,
+                also_known_as: operation.unsigned.also_known_as,
+                atproto_pds: operation
+                    .unsigned
+                    .services
+                    .get("atproto_pds")
+                    .unwrap()
+                    .endpoint
+                    .clone(),
                 signature: Signature::from_algorithm_and_bytes(
                     prism_keys::CryptoAlgorithm::Secp256k1,
                     &general_purpose::GeneralPurpose::new(
                         &alphabet::URL_SAFE,
                         general_purpose::NO_PAD,
                     )
-                    .decode(&operation.signature)
+                    .decode(&operation.sig)
                     .unwrap(),
                 )
                 .unwrap(),

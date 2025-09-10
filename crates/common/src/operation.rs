@@ -3,11 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::{self, collections::HashMap, fmt::Display};
 use utoipa::ToSchema;
 
-use crate::{account::Service, digest::Digest, transaction};
-use prism_keys::{CryptoAlgorithm, Signature, VerifyingKey};
-use prism_serde::base64::FromBase64;
+use crate::{account::Service, digest::Digest};
+use prism_keys::{Signature, VerifyingKey};
 
-use prism_errors::{OperationError, TransactionError};
+use prism_errors::OperationError;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[schema(
@@ -51,56 +50,7 @@ pub enum Operation {
     },
 }
 
-/*
-export const addSignature = async <T extends Record<string, unknown>>(
-  object: T,
-  key: Keypair,
-): Promise<T & { sig: string }> => {
-  const data = new Uint8Array(cbor.encode(object))
-  const sig = await key.sign(data)
-  return {
-    ...object,
-    sig: uint8arrays.toString(sig, 'base64url'),
-  }
-}
-
-export const formatAtprotoOp = (opts: {
-  signingKey: string
-  handle: string
-  pds: string
-  rotationKeys: string[]
-  prev: CID | null
-}): t.UnsignedOperation => {
-  return {
-    type: 'plc_operation',
-    verificationMethods: {
-      atproto: opts.signingKey,
-    },
-    rotationKeys: opts.rotationKeys,
-    alsoKnownAs: [ensureAtprotoPrefix(opts.handle)],
-    services: {
-      atproto_pds: {
-        type: 'AtprotoPersonalDataServer',
-        endpoint: ensureHttpPrefix(opts.pds),
-      },
-    },
-    prev: opts.prev?.toString() ?? null,
-  }
-}
-
-export const atprotoOp = async (opts: {
-  signingKey: string
-  handle: string
-  pds: string
-  rotationKeys: string[]
-  prev: CID | null
-  signer: Keypair
-}) => {
-  return addSignature(formatAtprotoOp(opts), opts.signer)
-}
-*/
-
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnsignedPLCOp {
     #[serde(rename = "type")]
@@ -117,7 +67,25 @@ pub struct UnsignedPLCOp {
     pub prev: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+impl UnsignedPLCOp {
+    pub fn new_genesis(
+        rotation_keys: Vec<String>,
+        verification_methods: HashMap<String, String>,
+        also_known_as: Vec<String>,
+        atproto_pds: String,
+    ) -> Self {
+        UnsignedPLCOp {
+            type_: "plc_operation".to_string(),
+            rotation_keys,
+            verification_methods,
+            also_known_as,
+            services: HashMap::from([("atproto_pds".to_string(), Service::new_pds(atproto_pds))]),
+            prev: None,
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SignedPLCOp {
     #[serde(flatten)]
@@ -180,35 +148,17 @@ impl SignedPLCOp {
         derived_did
     }
 
-    // Not needed because done on Transaction level before being converted into SignedPLCOp
-    // Takes vk to avoid re-conversion from string to VerifyingKey in circuit.
-    // pub fn verify_signature(&self, vk: VerifyingKey) -> Result<(), TransactionError> {
-    //     let cbor_val = serde_ipld_dagcbor::to_vec(&self).unwrap();
-    //     let hash = Digest::hash(cbor_val.as_slice());
+    // TODO(DID): This is very inefficient, and "reconverts" the signature back
+    // into a string in circuit. Pretty sure this can already be done at the
+    // operation level instead of here.
+    pub fn verify_signature(&self, vk: VerifyingKey) -> Result<(), prism_keys::CryptoError> {
+        let cbor_val = serde_ipld_dagcbor::to_vec(&self).unwrap();
+        let hash = Digest::hash(cbor_val.as_slice());
 
-    //     match &vk {
-    //         VerifyingKey::Secp256r1(key) => {
-    //             let sig_bytes =
-    //                 &Vec::from_base64(transaction::base64url_to_base64(&self.sig)).unwrap();
-    //             let signature =
-    //                 Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256r1, sig_bytes)
-    //                     .unwrap();
+        let sig = Signature::from_plc_signature(&self.sig).unwrap();
 
-    //             vk.verify_signature(message, signature)
-    //             signature.verify(hash, key)
-    //         }
-    //         VerifyingKey::Secp256k1(key) => {
-    //             let signature =
-    //                 Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &self.sig)?;
-    //             signature.verify(hash, key)
-    //         }
-    //         _ => Err(TransactionError::EncodingFailed(
-    //             "Signature type not supported for PLC operations".to_string(),
-    //         )),
-    //     }
-
-    //     vk.verify_signature(hash, &self.sig)
-    // }
+        vk.verify_signature(hash, &sig)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
@@ -275,67 +225,5 @@ impl Display for Operation {
     // just print the debug
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashMap;
-
-    use crate::{
-        account::Service,
-        operation::{SignedPLCOp, UnsignedPLCOp},
-    };
-
-    #[test]
-    fn test_did_creation() {
-        /*
-        * {
-          "did": "did:prism:yczau3zqp3lf7dtwffbac4y7",
-          "operation": {
-            "did": "did:prism:yczau3zqp3lf7dtwffbac4y7",
-            "verification_methods": {
-              "atproto": "did:key:zQ3shqps6kmePGGkLWoN9yjS622YVjix3i4X3Qrf1ks6bunQY"
-            },
-            "rotation_keys": [
-              "did:key:zQ3shTYYrKBPaMZArFcpggX8PESrEjhQcH3Qcin2y6onN12By",
-              "did:key:zQ3shmjpf1Rm5dkfmjhYEBNghqovFrcVsYWz4MnqMkiwx6Wh1"
-            ],
-            "also_known_as": [
-              "at://mod-authority.test"
-            ],
-            "atproto_pds": "http://localhost:64519"
-          },
-          "nonce": 0,
-          "signature": "A_f9qHR4Gl_DkI8kAr2HP2d5rdqon-aHCWKM4bkooZw_L2KfoRXmC--92eCZ0sIESuM6-h8cqsqcMVvqbNoIVw",
-          "vk": "did:key:zQ3shmjpf1Rm5dkfmjhYEBNghqovFrcVsYWz4MnqMkiwx6Wh1"
-        }
-        */
-
-        let plc_op = UnsignedPLCOp {
-            type_: "plc_operation".to_string(),
-            services: HashMap::from([(
-                "atproto_pds".to_string(),
-                Service::new_pds("http://localhost:65473".to_string()),
-            )]),
-            verification_methods: HashMap::from([(
-                "atproto".to_string(),
-                "did:key:zQ3shRqHqyhXgCjBmLyPhwN6ENSLMYCVUS7684MKrmVunRF8H".to_string(),
-            )]),
-            rotation_keys: vec![
-                "did:key:zQ3shYUkjUJWLxshqnPbDb1bwc2wMeRy65yQ7TdeotDRoA54G".to_string(),
-                "did:key:zQ3shZUHZuc3Z74mmMhZG2FS87oLqdiHBJyrv5vSc4tychPZF".to_string(),
-            ],
-            also_known_as: vec!["at://mod-authority.test".to_string()],
-            prev: None,
-        };
-
-        let signed = SignedPLCOp {
-            unsigned: plc_op,
-            sig: "F0_AgX0tghOjtCMPsMGxHP-8JL11GiR8ikgf68XofQAa1vgEZvEe9VBWFko8isAjT5pkcZOf0GBPAq1cujBNHw".to_string()
-        };
-        let did = signed.derive_did();
-
-        assert_eq!(did, "did:prism:3l3bnfketdgiqyfxjju4pfda".to_string());
     }
 }

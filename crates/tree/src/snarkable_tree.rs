@@ -1,25 +1,17 @@
-use std::{
-    collections::{HashMap, HashSet},
-    hash::Hash,
-};
-
 use anyhow::{Result, bail, ensure};
-use base32::Alphabet;
-use ciborium::{cbor, into_writer, ser};
 use jmt::{
     KeyHash,
     storage::{TreeReader, TreeWriter},
 };
 use prism_errors::DatabaseError;
 use prism_serde::binary::{FromBinary, ToBinary};
-use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use prism_common::{
-    account::{Account, Service},
+    account::Account,
     digest::Digest,
-    operation::{self, Operation, SignedPLCOp, UnsignedPLCOp},
-    transaction::{CreateDIDOp, Transaction},
+    operation::{Operation, SignedPLCOp},
+    transaction::Transaction,
 };
 
 use crate::{

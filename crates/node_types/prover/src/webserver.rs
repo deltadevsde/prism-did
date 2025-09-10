@@ -8,7 +8,7 @@ use prism_common::{
             AccountDidResponse, AccountRequest, AccountResponse, CommitmentResponse, DidDocument,
         },
     },
-    transaction::{DidTransaction, Transaction},
+    transaction::{SignedPlcTransaction, Transaction},
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
@@ -145,7 +145,7 @@ async fn post_transaction(
 #[utoipa::path(
     post,
     path = "/transaction_2",
-    request_body = DidTransaction,
+    request_body = SignedPlcTransaction,
     responses(
         (status = 200, description = "Entry update queued for insertion into next epoch"),
         (status = 400, description = "Bad request"),
@@ -154,7 +154,7 @@ async fn post_transaction(
 )]
 async fn post_transaction2(
     State(session): State<Arc<Prover>>,
-    Json(transaction): Json<DidTransaction>,
+    Json(transaction): Json<SignedPlcTransaction>,
 ) -> impl IntoResponse {
     let transaction = transaction.try_into().map_err(|e| {
         (

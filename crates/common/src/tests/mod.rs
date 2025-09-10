@@ -9,7 +9,7 @@ use prism_keys::{CryptoAlgorithm, Signature};
 use crate::{
     account::Service,
     operation::{SignedPLCOp, UnsignedPLCOp},
-    transaction::{DidTransaction, Transaction},
+    transaction::{SignedPlcTransaction, Transaction},
 };
 
 #[test]
@@ -46,7 +46,7 @@ fn test_did_creation() {
 #[test]
 fn plc_signature_verification() {
     let signature =
-        "KfujyA31EsKxeGfPhFya8qvPkHceM6a6g_BGQBV88tVuFi6wiH0e4cdBW8PKPgFbWn0yUWLvcDl6beF7W0WSuQ"
+        "C_EJ4mrlmfouuXepfMy2ZJkwTUGYyTy9TuL-EThzyYV9SwLenDeJaTOhYUFnJ-C4pxKOrghNjWueNQpEUAIbbw"
             .to_string();
     let sig_bytes =
         general_purpose::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD)
@@ -57,21 +57,21 @@ fn plc_signature_verification() {
     let reparsed_signature = parsed_signature.to_plc_signature().unwrap();
     assert_eq!(signature, reparsed_signature);
 
-    let key_str = "did:key:zQ3shpPtUdBEycBmidYtoCJ1KBa8bEiAMHoy3GLG2ynAKsagq";
+    let key_str = "did:key:zQ3shYxgqcVTCgB5z21jid9vfJy1GkFUySPMzLQDPUtdN5qPe";
 
     let plc_op = UnsignedPLCOp {
         type_: "plc_operation".to_string(),
         services: HashMap::from([(
             "atproto_pds".to_string(),
-            Service::new_pds("http://localhost:61369".to_string()),
+            Service::new_pds("http://localhost:49793".to_string()),
         )]),
         verification_methods: HashMap::from([(
             "atproto".to_string(),
-            "did:key:zQ3shkZNfhseu7MbfkkDHKshErD9t7UNRFBiuQGSUnj7cBvns".to_string(),
+            "did:key:zQ3shnpPSGRJGPFVNYZSrrz4CHjqW5eFau6gsGXFrdmsJ4axx".to_string(),
         )]),
         rotation_keys: vec![
-            "did:key:zQ3shuXBv8RBGxALdFPNtLsKzZRBpjVRVFMTXtqKP3tyfgews".to_string(),
-            "did:key:zQ3shpPtUdBEycBmidYtoCJ1KBa8bEiAMHoy3GLG2ynAKsagq".to_string(),
+            "did:key:zQ3shcmbGVVFBmW8kM1ffcrmPDFB8u4YFxWH7gemf6SpsGNzL".to_string(),
+            "did:key:zQ3shYxgqcVTCgB5z21jid9vfJy1GkFUySPMzLQDPUtdN5qPe".to_string(),
         ],
         also_known_as: vec!["at://mod-authority.test".to_string()],
         prev: None,
@@ -80,21 +80,21 @@ fn plc_signature_verification() {
     let signed = SignedPLCOp {
         unsigned: plc_op.clone(),
         sig:
-            "Fvpus8sZ_4byIBoah6HoTiCQ4RCZ-cuvAQUGGXUmGl0ZZJMoxM8gjBR3RTLdrxYCc7qKvi_TPeOz16dT8EHdSw"
+            "yFKwHXi1q5if7hhyYjp5boUx-IrgEDzslnQl-fwwGNsr0Mrbcgkkgjxo_H8v6SW7i2IgVNUPmM-VStgTPIu0mQ"
                 .to_string(),
     };
 
     let did = signed.derive_did();
-    assert_eq!(did, "did:prism:rx5azbjjhsbmhqv3kwrtn7vl");
+    assert_eq!(did, "did:prism:moipkdqlz5x3qjmdqjwa6zsk");
 
-    let tx: Transaction = DidTransaction {
+    let tx: Transaction = SignedPlcTransaction {
         did: did.clone(),
         operation: SignedPLCOp {
             unsigned: UnsignedPLCOp::new_genesis(
                 plc_op.rotation_keys.clone(),
                 plc_op.verification_methods.clone(),
                 plc_op.also_known_as.clone(),
-                "http://localhost:61369".to_string(),
+                "http://localhost:49793".to_string(),
             ),
             sig: signed.sig.clone(),
         },

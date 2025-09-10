@@ -58,7 +58,8 @@ impl UnsignedTransaction {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 /// Represents a prism transaction that can be applied to an account.
-pub struct DidTransaction {
+// TODO(DID): Flatten fields w serde - is ipld dag cbor crate using serde?
+pub struct SignedPlcTransaction {
     /// The account id that this transaction is for
     pub did: String,
     /// The [`Operation`] to be applied to the account
@@ -74,29 +75,33 @@ pub struct DidTransaction {
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, ToSchema)]
 /// Represents a prism transaction that can be applied to an account.
-pub struct USDidTransaction {
+pub struct UnsignedPlcTransaction {
     /// The account id that this transaction is for
     pub did: String,
     /// The [`Operation`] to be applied to the account
     pub operation: SignedPLCOp,
     /// The nonce of the account at the time of this transaction
     pub nonce: u64,
+    /// The verifying key of the signer of this transaction. This vk must be
+    /// included in the account's valid_keys set.
+    pub vk: String,
 }
 
-impl From<DidTransaction> for USDidTransaction {
-    fn from(tx: DidTransaction) -> Self {
-        USDidTransaction {
+impl From<SignedPlcTransaction> for UnsignedPlcTransaction {
+    fn from(tx: SignedPlcTransaction) -> Self {
+        UnsignedPlcTransaction {
             did: tx.did,
             operation: tx.operation,
             nonce: tx.nonce,
+            vk: tx.vk,
         }
     }
 }
 
-impl TryInto<DidTransaction> for Transaction {
+impl TryInto<SignedPlcTransaction> for Transaction {
     type Error = std::io::Error;
 
-    fn try_into(self) -> Result<DidTransaction, Self::Error> {
+    fn try_into(self) -> Result<SignedPlcTransaction, Self::Error> {
         match self.operation {
             Operation::CreateDID {
                 did,
@@ -123,7 +128,7 @@ impl TryInto<DidTransaction> for Transaction {
                     ),
                     sig: plc_sig.clone(),
                 };
-                Ok(DidTransaction {
+                Ok(SignedPlcTransaction {
                     did,
                     operation,
                     nonce: self.nonce,
@@ -139,11 +144,11 @@ impl TryInto<DidTransaction> for Transaction {
     }
 }
 
-impl TryInto<Transaction> for DidTransaction {
+impl TryInto<Transaction> for SignedPlcTransaction {
     type Error = std::io::Error;
 
     fn try_into(self) -> Result<Transaction, Self::Error> {
-        let DidTransaction {
+        let SignedPlcTransaction {
             did,
             operation,
             nonce,
@@ -234,8 +239,8 @@ impl Transaction {
 
     // Used for verifying CBOR-encoded transactions (for DID operations)
     pub fn verify_cbor_signature(&self) -> Result<(), TransactionError> {
-        let did_tx: DidTransaction = self.clone().try_into().unwrap();
-        let us_did_tx: USDidTransaction = did_tx.into();
+        let did_tx: SignedPlcTransaction = self.clone().try_into().unwrap();
+        let us_did_tx: UnsignedPlcTransaction = did_tx.into();
 
         let message = serde_ipld_dagcbor::to_vec(&us_did_tx)
             .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?;

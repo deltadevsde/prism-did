@@ -32,8 +32,7 @@ pub enum Operation {
         rotation_keys: Vec<VerifyingKey>,
         also_known_as: Vec<String>,
         atproto_pds: String,
-        // NOTE: This signature is not a prism signature, so is held in a string.
-        // TODO(did): Do validation anyways
+        // TODO(DID): Validation of this inner signature is to be done on OP level
         signature: Signature,
     },
     #[schema(title = "AddKey")]

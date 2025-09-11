@@ -19,7 +19,7 @@ mod key_tests {
                 .unwrap();
         let parsed_signature =
             Signature::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &sig_bytes).unwrap();
-        let reparsed_signature = parsed_signature.to_plc_signature().unwrap();
+        let reparsed_signature = parsed_signature.to_plc_signature();
         assert_eq!(signature, reparsed_signature);
     }
 

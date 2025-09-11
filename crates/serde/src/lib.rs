@@ -1,3 +1,4 @@
+pub mod base32;
 pub mod base64;
 pub mod bech32;
 pub mod binary;

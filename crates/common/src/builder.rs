@@ -135,48 +135,10 @@ where
     P: PrismApi,
 {
     prism: Option<&'a P>,
-    did: String,
     verification_methods: HashMap<String, VerifyingKey>,
     rotation_keys: Vec<VerifyingKey>,
     also_known_as: Vec<String>,
     atproto_pds: String,
-}
-// TODO(DID): not okay
-fn encode_base32(data: &[u8]) -> String {
-    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-    if data.is_empty() {
-        return String::new();
-    }
-
-    let mut result = String::new();
-    let mut buffer = 0u64;
-    let mut bits_in_buffer = 0;
-
-    for &byte in data {
-        buffer = (buffer << 8) | byte as u64;
-        bits_in_buffer += 8;
-
-        // Extract 5-bit chunks from the buffer
-        while bits_in_buffer >= 5 {
-            let index = ((buffer >> (bits_in_buffer - 5)) & 0x1F) as usize;
-            result.push(ALPHABET[index] as char);
-            bits_in_buffer -= 5;
-        }
-    }
-
-    // Handle remaining bits
-    if bits_in_buffer > 0 {
-        let index = ((buffer << (5 - bits_in_buffer)) & 0x1F) as usize;
-        result.push(ALPHABET[index] as char);
-    }
-
-    // Add padding
-    while result.len().is_multiple_of(8) {
-        result.push('=');
-    }
-
-    result
 }
 
 impl<'a, P> CreateDIDRequestBuilder<'a, P>
@@ -186,7 +148,6 @@ where
     pub fn new(prism: Option<&'a P>) -> Self {
         Self {
             prism,
-            did: String::new(),
             verification_methods: HashMap::new(),
             rotation_keys: Vec::new(),
             also_known_as: Vec::new(),

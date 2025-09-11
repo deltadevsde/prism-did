@@ -5,7 +5,7 @@ extern crate log;
 
 use anyhow::Result;
 // use prism_common::test_transaction_builder::TestTransactionBuilder;
-use prism_da::{DataAvailabilityLayer, FullNodeDAConfig, memory::InMemoryDataAvailabilityLayer};
+use prism_da::{DataAvailabilityLayer, memory::InMemoryDataAvailabilityLayer};
 use prism_keys::{CryptoAlgorithm, SigningKey};
 use prism_prover::{
     Prover, ProverEngineOptions, ProverOptions, SequencerOptions, SyncerOptions, WebServerConfig,
@@ -14,7 +14,6 @@ use prism_storage::{
     Database,
     rocksdb::{RocksDBConfig, RocksDBConnection},
 };
-use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::sync::Arc;
 use tokio::{spawn, time::Duration};
 

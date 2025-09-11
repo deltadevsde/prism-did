@@ -1,6 +1,6 @@
 use base64::{
     DecodeError, DecodeSliceError, Engine, decoded_len_estimate,
-    engine::general_purpose::STANDARD as BASE64,
+    engine::general_purpose::URL_SAFE_NO_PAD as BASE64,
 };
 
 pub trait ToBase64 {

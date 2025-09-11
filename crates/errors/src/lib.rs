@@ -144,12 +144,6 @@ pub enum ProofError {
     TransactionError(String),
 }
 
-impl From<bincode::Error> for ProofError {
-    fn from(err: bincode::Error) -> Self {
-        ProofError::EncodingError(err.to_string())
-    }
-}
-
 #[derive(Error, Clone, Debug)]
 pub enum OperationError {
     #[error("id cannot be empty when registering service")]

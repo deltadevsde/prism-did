@@ -92,7 +92,8 @@ impl InsertProof {
 
         // TODO(DID): Hash verification here
 
-        let serialized_account = account.encode_to_bytes()?;
+        let serialized_account =
+            account.encode_to_bytes().map_err(|e| ProofError::EncodingError(e.to_string()))?;
 
         self.membership_proof
             .clone()
@@ -129,7 +130,10 @@ impl UpdateProof {
     pub fn verify(&self) -> Result<(), ProofError> {
         // Verify existence of old value.
         // Otherwise, any arbitrary account could be set as old_account.
-        let old_serialized_account = self.old_account.encode_to_bytes()?;
+        let old_serialized_account = self
+            .old_account
+            .encode_to_bytes()
+            .map_err(|e| ProofError::EncodingError(e.to_string()))?;
         self.inclusion_proof
             .verify_existence(RootHash(self.old_root.0), self.key, old_serialized_account)
             .map_err(|e| ProofError::VerificationError(e.to_string()))?;
@@ -140,7 +144,8 @@ impl UpdateProof {
             .map_err(|e| ProofError::TransactionError(e.to_string()))?;
 
         // Ensure the update proof corresponds to the new account value
-        let new_serialized_account = new_account.encode_to_bytes()?;
+        let new_serialized_account =
+            new_account.encode_to_bytes().map_err(|e| ProofError::EncodingError(e.to_string()))?;
         self.update_proof
             .clone()
             .verify_update(
@@ -163,7 +168,8 @@ pub struct MerkleProof {
 
 impl MerkleProof {
     pub fn verify_existence(&self, value: &Account) -> Result<(), ProofError> {
-        let value = value.encode_to_bytes()?;
+        let value =
+            value.encode_to_bytes().map_err(|e| ProofError::EncodingError(e.to_string()))?;
         self.proof
             .verify_existence(RootHash(self.root.0), self.key, value)
             .map_err(|e| ProofError::VerificationError(e.to_string()))

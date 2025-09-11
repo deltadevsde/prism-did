@@ -7149,7 +7149,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "base32",
  "base64 0.22.1",
  "bs58 0.4.0",
  "celestia-types",
@@ -7158,7 +7157,6 @@ dependencies = [
  "prism-keys",
  "prism-serde",
  "serde",
- "serde_ipld_dagcbor",
  "sha2 0.10.8",
  "utoipa",
 ]
@@ -7196,7 +7194,6 @@ name = "prism-errors"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode",
  "thiserror 2.0.12",
 ]
 
@@ -7307,12 +7304,14 @@ name = "prism-serde"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base32",
  "base64 0.22.1",
  "bech32",
  "bincode",
  "hex",
  "serde",
  "serde_bytes",
+ "serde_ipld_dagcbor",
 ]
 
 [[package]]
@@ -7419,7 +7418,6 @@ dependencies = [
  "prism-serde",
  "prism-storage",
  "serde",
- "serde_ipld_dagcbor",
  "sha2 0.10.8",
  "tempfile",
  "tracing",

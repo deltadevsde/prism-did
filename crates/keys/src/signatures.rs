@@ -1,5 +1,4 @@
 use crate::{CryptoError, Result, errors::SignatureError};
-use base64::{Engine, engine::general_purpose};
 use ed25519_consensus::Signature as Ed25519Signature;
 use k256::ecdsa::Signature as Secp256k1Signature;
 use p256::ecdsa::Signature as Secp256r1Signature;
@@ -7,7 +6,7 @@ use pkcs8::{
     AlgorithmIdentifierRef, SecretDocument,
     der::{Decode, asn1::OctetStringRef, zeroize::Zeroize},
 };
-use prism_serde::base64::ToBase64;
+use prism_serde::base64::{FromBase64, ToBase64};
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
@@ -40,16 +39,15 @@ impl Signature {
         }
     }
 
-    pub fn to_plc_signature(&self) -> Result<String> {
+    pub fn to_plc_signature(&self) -> String {
         let sig_bytes = self.to_bytes();
-        let result = general_purpose::URL_SAFE_NO_PAD.encode(sig_bytes);
-
-        Ok(result)
+        sig_bytes.to_base64()
     }
 
     // TODO(DID): other blessed curve
     pub fn from_plc_signature(s: &str) -> Result<Self> {
-        let bytes = general_purpose::URL_SAFE_NO_PAD.decode(s).unwrap();
+        // TODO(DID): unwrap
+        let bytes = Vec::from_base64(s).unwrap();
         Self::from_algorithm_and_bytes(CryptoAlgorithm::Secp256k1, &bytes)
     }
 
@@ -156,6 +154,14 @@ impl From<Signature> for CryptoPayload {
             algorithm: signature.algorithm(),
             bytes: signature.to_bytes(),
         }
+    }
+}
+
+impl TryFrom<String> for Signature {
+    type Error = CryptoError;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::from_plc_signature(&value)
     }
 }
 

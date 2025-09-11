@@ -1,4 +1,4 @@
-use base32::Alphabet;
+use prism_serde::{base32::ToBase32, binary::ToBinary};
 use serde::{Deserialize, Serialize};
 use std::{self, collections::HashMap, fmt::Display};
 use utoipa::ToSchema;
@@ -128,7 +128,7 @@ impl TryFrom<&Operation> for SignedPLCOp {
 
                 Ok(SignedPLCOp {
                     unsigned: plc_op,
-                    sig: signature.to_plc_signature().unwrap(),
+                    sig: signature.to_plc_signature(),
                 })
             }
             _ => Err(OperationError::InvalidPLCConversion),
@@ -138,11 +138,11 @@ impl TryFrom<&Operation> for SignedPLCOp {
 
 impl SignedPLCOp {
     pub fn derive_did(&self) -> String {
-        let cbor_val = serde_ipld_dagcbor::to_vec(&self).unwrap();
+        let cbor_val = self.encode_to_bytes().unwrap();
         let hash = Digest::hash(cbor_val.as_slice());
 
-        let b32 = base32::encode(Alphabet::Rfc4648Lower { padding: false }, hash.as_bytes());
-        let derived_did = format!("did:prism:{}", b32[0..24].to_string());
+        let b32 = hash.to_base32();
+        let derived_did = format!("did:prism:{}", &b32[0..24]);
 
         derived_did
     }
@@ -151,7 +151,7 @@ impl SignedPLCOp {
     // into a string in circuit. Pretty sure this can already be done at the
     // operation level instead of here.
     pub fn verify_signature(&self, vk: VerifyingKey) -> Result<(), prism_keys::CryptoError> {
-        let cbor_val = serde_ipld_dagcbor::to_vec(&self).unwrap();
+        let cbor_val = self.encode_to_bytes().unwrap();
         let hash = Digest::hash(cbor_val.as_slice());
 
         let sig = Signature::from_plc_signature(&self.sig).unwrap();

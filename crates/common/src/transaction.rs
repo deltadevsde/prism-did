@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use base64::{Engine as _, alphabet, engine::general_purpose};
 use celestia_types::Blob;
 use prism_errors::TransactionError;
 use prism_keys::{Signature, SigningKey, VerifyingKey};
@@ -118,7 +117,7 @@ impl TryInto<SignedPlcTransaction> for Transaction {
                 let rotation_keys: Vec<String> =
                     rotation_keys.into_iter().map(|a| a.to_did().unwrap()).collect();
 
-                let plc_sig = signature.to_plc_signature().unwrap();
+                let plc_sig = signature.to_plc_signature();
                 let operation = SignedPLCOp {
                     unsigned: UnsignedPLCOp::new_genesis(
                         rotation_keys,
@@ -183,25 +182,10 @@ impl TryInto<Transaction> for SignedPlcTransaction {
                     .unwrap()
                     .endpoint
                     .clone(),
-                signature: Signature::from_algorithm_and_bytes(
-                    prism_keys::CryptoAlgorithm::Secp256k1,
-                    &general_purpose::GeneralPurpose::new(
-                        &alphabet::URL_SAFE,
-                        general_purpose::NO_PAD,
-                    )
-                    .decode(&operation.sig)
-                    .unwrap(),
-                )
-                .unwrap(),
+                signature: Signature::try_from(operation.sig).unwrap(),
             },
             nonce,
-            signature: Signature::from_algorithm_and_bytes(
-                prism_keys::CryptoAlgorithm::Secp256k1,
-                &general_purpose::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD)
-                    .decode(&signature)
-                    .unwrap(),
-            )
-            .unwrap(),
+            signature: Signature::try_from(signature).unwrap(),
             vk: VerifyingKey::from_did(&vk).unwrap(),
         })
     }
@@ -242,7 +226,8 @@ impl Transaction {
         let did_tx: SignedPlcTransaction = self.clone().try_into().unwrap();
         let us_did_tx: UnsignedPlcTransaction = did_tx.into();
 
-        let message = serde_ipld_dagcbor::to_vec(&us_did_tx)
+        let message = us_did_tx
+            .encode_to_bytes()
             .map_err(|e| TransactionError::EncodingFailed(e.to_string()))?;
 
         self.vk

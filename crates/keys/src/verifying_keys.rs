@@ -18,12 +18,11 @@ use pkcs8::{
     Document, LineEnding, SubjectPublicKeyInfoRef,
     der::{Decode, pem::PemLabel},
 };
-use serde::{Deserialize, Deserializer, Serialize, de};
+use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::{
     self,
     borrow::Cow,
-    fmt,
     hash::{Hash, Hasher},
     path::Path,
 };

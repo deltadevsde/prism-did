@@ -11,6 +11,7 @@ use prism_common::{
     transaction::{SignedPlcTransaction, Transaction},
 };
 use serde::{Deserialize, Serialize};
+use sp1_sdk::network::proto::types::ClaimGpuRequest;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
@@ -229,8 +230,13 @@ async fn get_did_document(
     Json(request): Json<AccountRequest>,
 ) -> impl IntoResponse {
     info!("Retrieving DID document for account ID: {}", request.id);
+    let full_did = if request.id.starts_with("did:prism:") {
+        request.id.clone()
+    } else {
+        format!("did:prism:{}", request.id)
+    };
 
-    let account_response = match session.get_account(&request.id).await {
+    let account_response = match session.get_account(&full_did).await {
         Ok(response) => response,
         Err(e) => {
             error!("Failed to retrieve account for DID document: {}", e);
@@ -252,6 +258,8 @@ async fn get_did_document(
         );
         None
     };
+
+    println!("DID Document: {:?}", did_document);
 
     let response = AccountDidResponse {
         account: account_response.account,
